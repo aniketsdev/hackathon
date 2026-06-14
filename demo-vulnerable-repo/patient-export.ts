@@ -1,5 +1,6 @@
 export async function GET(req: Request) {
-  const apiKey = "sk-demo-hardcoded-key";
+  const password = "demo-secret-placeholder";
+  const patientEmail = "rahul.sharma@example.test";
 
   const patient = {
     name: "Rahul Sharma",
@@ -7,7 +8,7 @@ export async function GET(req: Request) {
     diagnosis: "diabetes"
   };
 
-  console.log("Patient data:", patient);
+  console.log("Patient data:", patient, patientEmail);
 
   const query = "SELECT * FROM patients WHERE id = " + req.url;
 

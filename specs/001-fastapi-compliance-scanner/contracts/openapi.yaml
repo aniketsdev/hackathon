@@ -1,0 +1,234 @@
+openapi: 3.1.0
+info:
+  title: ComplyPatch AI Demo API
+  version: 0.1.0
+  description: Contract for ephemeral compliance/security scan reports and mocked PR review comments.
+paths:
+  /api/scan:
+    post:
+      summary: Create a compliance scan
+      description: Runs deterministic scanner rules and optionally attaches OpenAI-assisted analysis from locally redacted snippets.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanRequest"
+            examples:
+              changedFiles:
+                summary: Changed files
+                value:
+                  files:
+                    - path: demo-vulnerable-repo/patient-export.ts
+                      content: "export async function GET() { console.log('patient diagnosis'); }"
+                  enableAiAnalysis: false
+              localPath:
+                summary: Demo local repository path
+                value:
+                  localPath: ./demo-vulnerable-repo
+                  enableAiAnalysis: true
+      responses:
+        "200":
+          description: Scan completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanResponse"
+        "400":
+          description: Invalid input or demo scan limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected scan failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/pr-comment:
+    post:
+      summary: Mock PR comment posting
+      description: Accepts a generated PR-style comment and returns a mocked success response. Live GitHub posting is out of scope for v1.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrCommentRequest"
+      responses:
+        "200":
+          description: Mock comment accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrCommentResponse"
+        "400":
+          description: Invalid comment payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/scans:
+    post:
+      summary: Optional FastAPI-compatible alias for creating a compliance scan
+      description: Kept for the existing backend service path when that path is used.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanRequest"
+      responses:
+        "200":
+          description: Scan completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanResponse"
+        "400":
+          description: Invalid input or demo scan limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    ScanRequest:
+      type: object
+      properties:
+        files:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/SourceFile"
+        localPath:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Local repository or directory path for demo scanning.
+        code:
+          type: string
+          maxLength: 200000
+          description: Optional pasted code content.
+        path:
+          type: string
+          maxLength: 300
+          description: Display path for pasted code content.
+        enableAiAnalysis:
+          type: boolean
+          default: false
+      anyOf:
+        - required: [files]
+        - required: [localPath]
+        - required: [code]
+    SourceFile:
+      type: object
+      required: [path, content]
+      properties:
+        path:
+          type: string
+          minLength: 1
+          maxLength: 300
+        content:
+          type: string
+          maxLength: 200000
+    ScanResponse:
+      type: object
+      required: [score, summary, findingCounts, findings, aiAnalysis, prComment, disclaimer]
+      properties:
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        summary:
+          type: string
+        findingCounts:
+          type: object
+          additionalProperties:
+            type: integer
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        aiAnalysis:
+          $ref: "#/components/schemas/AIAnalysisResult"
+        prComment:
+          type: string
+        disclaimer:
+          type: string
+          example: This report provides compliance assistance, not legal certification.
+        skipped:
+          type: array
+          items:
+            type: string
+    Finding:
+      type: object
+      required: [ruleId, title, severity, category, file, line, evidence, impact, fix, masked]
+      properties:
+        ruleId:
+          type: string
+        title:
+          type: string
+        severity:
+          type: string
+          enum: [Critical, High, Medium, Low]
+        category:
+          type: string
+          enum: [secret, phi_logging, missing_auth, unsafe_sql, insecure_cookie, unsafe_cors]
+        file:
+          type: string
+        line:
+          type: integer
+          minimum: 1
+        evidence:
+          type: string
+          description: Masked evidence excerpt.
+        impact:
+          type: string
+        fix:
+          type: string
+        masked:
+          type: boolean
+    AIAnalysisResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [not_configured, skipped, completed, failed]
+        summary:
+          type: string
+        complianceContext:
+          type: string
+        suggestedRemediation:
+          type: string
+        errorMessage:
+          type: string
+    PrCommentRequest:
+      type: object
+      required: [comment]
+      properties:
+        comment:
+          type: string
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+    PrCommentResponse:
+      type: object
+      required: [ok, message]
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+        received:
+          type: object
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

@@ -8,6 +8,12 @@ export async function GET(req: Request) {
   // Do not log patient data. Log only safe metadata.
   console.info("Patient export requested", { userId: user.id });
 
+  cookies().set("session", "abc123", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict"
+  });
+
   return Response.json(maskPatientForExport(patient), {
     headers: {
       "Access-Control-Allow-Origin": "https://app.example.com"
