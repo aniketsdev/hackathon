@@ -39,7 +39,7 @@ export async function loadGitHubRepository(params: {
 }): Promise<{ files: SourceFile[]; skipped: string[] }> {
   const repo = parseGitHubRepo(params.repoUrl);
   const configuredToken = process.env.GITHUB_TOKEN || undefined;
-  const token = params.useConfiguredToken ? params.accessToken || configuredToken : params.accessToken || undefined;
+  const token = params.accessToken || configuredToken;
 
   if (params.useConfiguredToken && !token) {
     throw new Error("Private GitHub scans require GitHub login or GITHUB_TOKEN in the server environment");
