@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Severity = Literal["Critical", "High", "Medium", "Low"]
 DeliveryStatus = Literal["received", "ignored", "rejected", "processing", "completed", "failed"]
@@ -44,8 +44,15 @@ class WebhookAck(BaseModel):
 
 
 class RepositoryConnectRequest(BaseModel):
-    repositoryFullName: str = Field(min_length=3, max_length=300)
+    repositoryFullName: str | None = Field(default=None, min_length=3, max_length=300)
+    repositoryUrl: str | None = Field(default=None, min_length=10, max_length=500)
     installationId: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def require_repository_identity(self) -> "RepositoryConnectRequest":
+        if not self.repositoryFullName and not self.repositoryUrl:
+            raise ValueError("repositoryFullName or repositoryUrl is required")
+        return self
 
 
 class ConnectedRepositoryResponse(BaseModel):
