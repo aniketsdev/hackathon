@@ -53,5 +53,8 @@ export type ScanRequestInput = {
   code?: string;
   path?: string;
   localPath?: string;
+  githubRepoUrl?: string;
+  githubRef?: string;
+  githubAccess?: "public" | "configured-token";
   enableAiAnalysis?: boolean;
 };

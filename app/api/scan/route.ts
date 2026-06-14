@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateAiAnalysis } from "@/lib/agents/compliance-agent";
+import { loadGitHubRepository } from "@/lib/github/repo-loader";
 import { loadLocalPath, MAX_FILE_CHARS, MAX_SCAN_FILES } from "@/lib/scanner/local-input";
 import { buildRiskReport } from "@/lib/scanner/report";
 import { scanFiles } from "@/lib/scanner/scan";
@@ -51,6 +52,16 @@ async function resolveScanFiles(body: ScanRequestInput): Promise<{ files: Source
     skipped.push(...localInput.skipped);
   }
 
+  if (typeof body.githubRepoUrl === "string" && body.githubRepoUrl.trim()) {
+    const githubInput = await loadGitHubRepository({
+      repoUrl: body.githubRepoUrl,
+      ref: typeof body.githubRef === "string" ? body.githubRef : undefined,
+      useConfiguredToken: body.githubAccess === "configured-token"
+    });
+    files.push(...githubInput.files);
+    skipped.push(...githubInput.skipped);
+  }
+
   if (files.length === 0) {
     throw new Error("Provide files, pasted code, or localPath to scan");
   }
@@ -92,5 +103,7 @@ function validateFiles(files: SourceFile[]) {
 }
 
 function isUserError(message: string) {
-  return /required|provide|limit|localPath|unsupported|unreadable|exceeds|array/i.test(message);
+  return /required|provide|limit|localPath|unsupported|unreadable|exceeds|array|github|repository|repo|token|url|ref/i.test(
+    message
+  );
 }
