@@ -5,6 +5,9 @@ import unittest
 from hashlib import sha256
 
 from backend.github.client import GitHubApiError, GitHubSettings, connect_repository
+from fastapi.testclient import TestClient
+
+from backend.github.client import GitHubApiError, GitHubSettings, connect_repository, normalize_repository_identifier
 from backend.github.state import DemoOperationStore, is_repository_connected, reset_state
 from backend.github.webhook import process_github_webhook, verify_signature
 from backend.main import connect_github_repository, get_github_operation
@@ -117,6 +120,30 @@ class GitHubWebhookTest(unittest.TestCase):
         self.assertTrue(is_repository_connected("owner/repo"))
         self.assertEqual(rejected.connectionStatus, "failed")
         self.assertEqual(rejected.message, "Repository is not allowed")
+
+    def test_repository_connection_accepts_dynamic_github_url(self) -> None:
+        settings = GitHubSettings(
+            webhook_secret="test-secret",
+            token=None,
+            post_comments=False,
+            allowed_repositories=set(),
+        )
+
+        connected = connect_repository(
+            RepositoryConnectRequest(repositoryUrl="https://github.com/owner/repo"),
+            settings=settings,
+        )
+
+        self.assertEqual(connected.connectionStatus, "connected")
+        self.assertEqual(connected.repositoryFullName, "owner/repo")
+        self.assertTrue(is_repository_connected("owner/repo"))
+
+    def test_repository_identifier_normalization(self) -> None:
+        self.assertEqual(normalize_repository_identifier("owner/repo"), "owner/repo")
+        self.assertEqual(normalize_repository_identifier("https://github.com/owner/repo"), "owner/repo")
+        self.assertEqual(normalize_repository_identifier("https://github.com/owner/repo.git"), "owner/repo")
+        self.assertEqual(normalize_repository_identifier("git@github.com:owner/repo.git"), "owner/repo")
+        self.assertIsNone(normalize_repository_identifier("https://example.com/owner/repo"))
 
     def test_invalid_signature_is_rejected_and_persisted(self) -> None:
         raw_body = b'{"zen":"Keep it logically awesome."}'
@@ -290,13 +317,21 @@ class GitHubWebhookTest(unittest.TestCase):
             response = connect_github_repository(
                 RepositoryConnectRequest(repositoryFullName="owner/repo"),
             )
-            rejected = connect_github_repository(
-                RepositoryConnectRequest(repositoryFullName="other/repo"),
+            url_response = client.post(
+                "/api/github/repositories",
+                json={"repositoryUrl": "https://github.com/owner/repo"},
+            )
+            rejected = client.post(
+                "/api/github/repositories",
+                json={"repositoryFullName": "other/repo"},
             )
         finally:
             self._restore_env("GITHUB_ALLOWED_REPOSITORIES", previous_allowed)
 
-        self.assertEqual(response.connectionStatus, "connected")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["connectionStatus"], "connected")
+        self.assertEqual(url_response.status_code, 201)
+        self.assertEqual(url_response.json()["repositoryFullName"], "owner/repo")
         self.assertEqual(rejected.status_code, 400)
 
     def _headers(self, delivery_id: str, event: str, raw_body: bytes) -> dict[str, str]:

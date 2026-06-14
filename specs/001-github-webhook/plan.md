@@ -6,7 +6,7 @@
 
 ## Summary
 
-Add a GitHub-connected PR review path to ComplyPatch AI. Users connect a GitHub repository, GitHub sends pull request webhook deliveries, the FastAPI backend verifies each live delivery, collects changed code for supported PR events, runs the existing scanner, generates the existing PR-style risk report, and posts or updates a single ComplyPatch AI comment on the pull request. When GitHub write access is unavailable, the same generated comment is exposed as a local preview.
+Add a GitHub-connected PR review path to ComplyPatch AI. Users connect a GitHub repository dynamically by URL or `owner/repo`, GitHub sends pull request webhook deliveries, the FastAPI backend verifies each live delivery, collects changed code for supported PR events, runs the existing scanner, generates the existing PR-style risk report, and posts or updates a single ComplyPatch AI comment on the pull request. When GitHub write access is unavailable, the same generated comment is exposed as a local preview.
 
 ## Technical Context
 
@@ -24,9 +24,11 @@ Add a GitHub-connected PR review path to ComplyPatch AI. Users connect a GitHub 
 
 **Performance Goals**: A supported demo-sized pull request delivery is acknowledged quickly and produces scan/comment output within 60 seconds
 
-**Constraints**: Keep demo stable; do not commit GitHub app keys, webhook secrets, access tokens, or OpenAI keys; verify live webhook signatures before processing; do not break the existing sample scan button; keep live GitHub posting optional
+**Constraints**: Keep demo stable; do not commit GitHub app keys, webhook secrets, access tokens, or OpenAI keys; verify live webhook signatures before processing; do not break the existing sample scan button; keep live GitHub posting optional; do not add UI work for this slice
 
-**Scale/Scope**: One or a small set of demo repositories, pull request events only, up to 50 changed files and 200,000 characters per file content item
+**Scale/Scope**: One or a small set of dynamically connected demo repositories, pull request events only, up to 50 changed files and 200,000 characters per file content item
+
+**Runtime GitHub Configuration**: `GITHUB_WEBHOOK_SECRET` is required for live webhook verification. `GITHUB_TOKEN` is required only for GitHub REST calls that fetch private repository content or post/update PR comments. `GITHUB_POST_COMMENTS=true` enables live comment writes. `GITHUB_ALLOWED_REPOSITORIES` is optional and acts as a comma-separated safety allowlist; leaving it empty permits repositories connected through `POST /api/github/repositories`. `GITHUB_API_BASE_URL` is optional for GitHub Enterprise. Fixed `GITHUB_OWNER` and `GITHUB_REPO` values are not part of this design.
 
 ## Constitution Check
 
@@ -111,7 +113,7 @@ Design outputs:
 
 ## Post-Design Constitution Check
 
-- Stable demo first: PASS. Local fixture validation and preview mode work without live GitHub writes.
+- Stable demo first: PASS. Local fixture validation, dynamic repository connection, and preview mode work without live GitHub writes.
 - Simple working code: PASS. No database, queue, or background worker is mandatory for the first demo.
 - No large dependencies without approval: PASS. Standard-library signature verification and existing backend modules are sufficient.
 - No committed secrets: PASS. Runtime env values only.

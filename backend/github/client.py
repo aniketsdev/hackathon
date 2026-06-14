@@ -197,13 +197,14 @@ def connect_repository(
     settings: GitHubSettings | None = None,
 ) -> ConnectedRepositoryResponse:
     settings = settings or GitHubSettings.from_env()
-    repository = normalize_repository_full_name(request.repositoryFullName)
+    source_value = request.repositoryFullName or request.repositoryUrl or ""
+    repository = normalize_repository_identifier(source_value)
     if not repository:
         return ConnectedRepositoryResponse(
-            repositoryFullName=request.repositoryFullName,
+            repositoryFullName=source_value,
             connectionStatus="failed",
             permissionsStatus="unknown",
-            message="Repository must use owner/repo format",
+            message="Repository must use owner/repo format or a GitHub repository URL",
         )
     if not settings.allows_repository(repository):
         return ConnectedRepositoryResponse(
@@ -222,11 +223,32 @@ def connect_repository(
     return store.connect_repository(repository, permissions_status=permissions, message=message)
 
 
-def normalize_repository_full_name(value: str) -> str | None:
-    repository = value.strip().strip("/")
+def normalize_repository_identifier(value: str) -> str | None:
+    candidate = value.strip()
+    if not candidate:
+        return None
+
+    if candidate.startswith(("http://", "https://")):
+        parsed = urllib.parse.urlparse(candidate)
+        if parsed.netloc.lower() not in {"github.com", "www.github.com"}:
+            return None
+        parts = [part for part in parsed.path.strip("/").split("/") if part]
+        if len(parts) < 2:
+            return None
+        candidate = f"{parts[0]}/{parts[1]}"
+    elif candidate.startswith("git@github.com:"):
+        candidate = candidate.removeprefix("git@github.com:")
+
+    repository = candidate.strip().strip("/")
+    if repository.endswith(".git"):
+        repository = repository[:-4]
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
         return None
     return repository
+
+
+def normalize_repository_full_name(value: str) -> str | None:
+    return normalize_repository_identifier(value)
 
 
 def load_dotenv(path: str | Path = ".env") -> None:

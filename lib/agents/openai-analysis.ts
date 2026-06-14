@@ -79,12 +79,20 @@ export async function requestOpenAIAnalysis(context: AiFindingContext[]): Promis
 
 function normalizeAiContent(content: string): AIAnalysisResult {
   try {
-    const parsed = JSON.parse(stripJsonFence(content)) as Partial<AIAnalysisResult>;
+    const parsed = JSON.parse(stripJsonFence(content)) as unknown;
+    const fields = isRecord(parsed) ? parsed : {};
+
     return {
       status: "completed",
-      summary: parsed.summary || "AI analysis completed.",
-      complianceContext: parsed.complianceContext || "Review the flagged security and privacy risks before merge.",
-      suggestedRemediation: parsed.suggestedRemediation || "Prioritize critical and high findings first."
+      summary: normalizeAiText(fields.summary, "AI analysis completed."),
+      complianceContext: normalizeAiText(
+        fields.complianceContext,
+        "Review the flagged security and privacy risks before merge."
+      ),
+      suggestedRemediation: normalizeAiText(
+        fields.suggestedRemediation,
+        "Prioritize critical and high findings first."
+      )
     };
   } catch {
     return {
@@ -98,4 +106,67 @@ function normalizeAiContent(content: string): AIAnalysisResult {
 
 function stripJsonFence(value: string) {
   return value.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+}
+
+function normalizeAiText(value: unknown, fallback: string): string {
+  if (typeof value === "string") {
+    return value.trim() || fallback;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    const text = value.map((item) => normalizeAiText(item, "")).filter(Boolean).join(" ");
+    return text || fallback;
+  }
+
+  if (isRecord(value)) {
+    const findingSummary = formatFindingSummary(value);
+    if (findingSummary) return findingSummary;
+
+    const text = Object.entries(value)
+      .map(([key, item]) => {
+        const itemText = normalizeAiText(item, "");
+        return itemText ? `${formatFieldName(key)}: ${itemText}` : "";
+      })
+      .filter(Boolean)
+      .join(". ");
+
+    return text || fallback;
+  }
+
+  return fallback;
+}
+
+function formatFindingSummary(value: Record<string, unknown>) {
+  const severity = normalizeOptionalText(value.severity);
+  const category = normalizeOptionalText(value.category);
+  const affectedFile = normalizeOptionalText(value.affectedFile);
+  const findingsCount = normalizeOptionalText(value.findingsCount);
+
+  if (!severity && !category && !affectedFile && !findingsCount) {
+    return "";
+  }
+
+  const risk = [severity, category].filter(Boolean).join(" ");
+  const location = affectedFile ? ` in ${affectedFile}` : "";
+  const count = findingsCount ? ` (${findingsCount} finding${findingsCount === "1" ? "" : "s"})` : "";
+
+  return `${risk || "Finding"}${location}${count}.`;
+}
+
+function normalizeOptionalText(value: unknown) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+function formatFieldName(value: string) {
+  return value.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

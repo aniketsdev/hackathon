@@ -4,6 +4,8 @@ FastAPI backend for scanning changed files and returning compliance findings.
 
 ## Run
 
+Run from the repository root, not from inside `backend/`, because the app imports the `backend` package by name:
+
 ```bash
 uv sync
 uv run uvicorn backend.main:app --reload --port 8000
@@ -14,7 +16,8 @@ GitHub webhook operation status can use Postgres for production-style persistenc
 ```text
 GITHUB_WEBHOOK_SECRET=dev-webhook-secret-change-me
 GITHUB_POST_COMMENTS=false
-GITHUB_ALLOWED_REPOSITORIES=owner/repo
+GITHUB_ALLOWED_REPOSITORIES=
+GITHUB_API_BASE_URL=https://api.github.com
 GITHUB_TOKEN=
 GITHUB_OPERATION_STORE=postgres
 DATABASE_URL=postgresql://user:password@localhost:5432/complypatch
@@ -47,6 +50,8 @@ Repository connection request:
   "repositoryFullName": "owner/repo"
 }
 ```
+
+Repository identity is dynamic. The connection endpoint should accept `owner/repo` or a GitHub URL and normalize it; fixed `GITHUB_OWNER` and `GITHUB_REPO` values are not required.
 
 Request shape:
 
