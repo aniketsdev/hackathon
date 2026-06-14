@@ -189,16 +189,24 @@ class PostgresOperationStore:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO scan_results (delivery_id, score, summary, findings, pr_comment, completed_at)
-                    VALUES (%s, %s, %s, %s, %s, now())
+                    INSERT INTO scan_results (delivery_id, score, summary, findings, ai_analysis, pr_comment, completed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, now())
                     ON CONFLICT (delivery_id) DO UPDATE SET
                         score = EXCLUDED.score,
                         summary = EXCLUDED.summary,
                         findings = EXCLUDED.findings,
+                        ai_analysis = EXCLUDED.ai_analysis,
                         pr_comment = EXCLUDED.pr_comment,
                         completed_at = now()
                     """,
-                    (delivery_id, scan.score, scan.summary, Jsonb(findings), scan.prComment),
+                    (
+                        delivery_id,
+                        scan.score,
+                        scan.summary,
+                        Jsonb(findings),
+                        Jsonb(scan.aiAnalysis.model_dump(mode="json")) if scan.aiAnalysis else None,
+                        scan.prComment,
+                    ),
                 )
 
     def save_outbound_action(
@@ -293,6 +301,7 @@ class PostgresOperationStore:
             summary=row["summary"],
             findings=row["findings"] or [],
             prComment=row["pr_comment"],
+            aiAnalysis=row.get("ai_analysis"),
         )
 
     def _outbound_response(self, row: dict[str, Any]) -> OutboundOperation:

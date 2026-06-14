@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateAiAnalysis } from "@/lib/agents/compliance-agent";
+import { decryptGitHubToken, GITHUB_TOKEN_COOKIE } from "@/lib/github/oauth-session";
 import { loadGitHubRepository } from "@/lib/github/repo-loader";
 import { loadLocalPath, MAX_FILE_CHARS, MAX_SCAN_FILES } from "@/lib/scanner/local-input";
 import { buildRiskReport } from "@/lib/scanner/report";
@@ -9,7 +10,8 @@ import type { ScanRequestInput, SourceFile } from "@/lib/scanner/types";
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ScanRequestInput;
-    const { files, skipped } = await resolveScanFiles(body);
+    const githubAccessToken = decryptGitHubToken(request.cookies.get(GITHUB_TOKEN_COOKIE)?.value) || undefined;
+    const { files, skipped } = await resolveScanFiles(body, githubAccessToken);
 
     const findings = scanFiles(files);
     const aiAnalysis = await generateAiAnalysis({
@@ -31,7 +33,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function resolveScanFiles(body: ScanRequestInput): Promise<{ files: SourceFile[]; skipped: string[] }> {
+async function resolveScanFiles(
+  body: ScanRequestInput,
+  githubAccessToken?: string
+): Promise<{ files: SourceFile[]; skipped: string[] }> {
   const files: SourceFile[] = [];
   const skipped: string[] = [];
 
@@ -56,7 +61,8 @@ async function resolveScanFiles(body: ScanRequestInput): Promise<{ files: Source
     const githubInput = await loadGitHubRepository({
       repoUrl: body.githubRepoUrl,
       ref: typeof body.githubRef === "string" ? body.githubRef : undefined,
-      useConfiguredToken: body.githubAccess === "configured-token"
+      useConfiguredToken: body.githubAccess === "configured-token",
+      accessToken: githubAccessToken
     });
     files.push(...githubInput.files);
     skipped.push(...githubInput.skipped);

@@ -5,7 +5,7 @@ import json
 from hashlib import sha256
 from typing import Any, Mapping
 
-from backend.agents.compliance_agent import generate_summary
+from backend.agents.compliance_agent import generate_ai_analysis, generate_summary
 from backend.github.client import GitHubApiError, GitHubClient, GitHubSettings, sanitize_error
 from backend.github.operations import operation_store_from_env
 from backend.github.state import DemoOperationStore
@@ -158,9 +158,10 @@ def process_github_webhook(
         findings = scan_files(source_files)
         score = calculate_score(findings)
         summary = generate_summary(score, findings)
+        ai_analysis = generate_ai_analysis(score, findings)
         marker = build_comment_marker(head_sha)
-        comment = generate_pr_comment(score, findings, marker=marker)
-        scan = ScanResponse(score=score, summary=summary, findings=findings, prComment=comment)
+        comment = generate_pr_comment(score, findings, marker=marker, ai_analysis=ai_analysis)
+        scan = ScanResponse(score=score, summary=summary, findings=findings, prComment=comment, aiAnalysis=ai_analysis)
         store.save_scan_result(delivery_id, scan)
 
         outbound = _handle_outbound_comment(

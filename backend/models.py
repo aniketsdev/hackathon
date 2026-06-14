@@ -3,6 +3,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, model_validator
 
 Severity = Literal["Critical", "High", "Medium", "Low"]
+AIAnalysisStatus = Literal["not_configured", "skipped", "completed", "failed"]
+AIRiskLevel = Literal["low", "medium", "high", "critical"]
 DeliveryStatus = Literal["received", "ignored", "rejected", "processing", "completed", "failed"]
 OutboundMode = Literal["post", "update", "preview"]
 OutboundStatus = Literal["not_configured", "pending", "posted", "updated", "failed"]
@@ -30,11 +32,22 @@ class ScanRequest(BaseModel):
     files: list[SourceFile] = Field(min_length=1, max_length=50)
 
 
+class AIAnalysis(BaseModel):
+    status: AIAnalysisStatus
+    riskScore: int | None = Field(default=None, ge=0, le=100)
+    riskLevel: AIRiskLevel | None = None
+    summary: str | None = None
+    complianceContext: str | None = None
+    suggestedRemediation: str | None = None
+    errorMessage: str | None = None
+
+
 class ScanResponse(BaseModel):
     score: int = Field(ge=0, le=100)
     summary: str
     findings: list[Finding]
     prComment: str
+    aiAnalysis: AIAnalysis | None = None
 
 
 class WebhookAck(BaseModel):

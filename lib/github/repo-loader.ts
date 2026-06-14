@@ -35,12 +35,14 @@ export async function loadGitHubRepository(params: {
   repoUrl: string;
   ref?: string;
   useConfiguredToken?: boolean;
+  accessToken?: string;
 }): Promise<{ files: SourceFile[]; skipped: string[] }> {
   const repo = parseGitHubRepo(params.repoUrl);
-  const token = process.env.GITHUB_TOKEN || undefined;
+  const configuredToken = process.env.GITHUB_TOKEN || undefined;
+  const token = params.useConfiguredToken ? params.accessToken || configuredToken : params.accessToken || undefined;
 
   if (params.useConfiguredToken && !token) {
-    throw new Error("Private GitHub scans require GITHUB_TOKEN in the server environment");
+    throw new Error("Private GitHub scans require GitHub login or GITHUB_TOKEN in the server environment");
   }
 
   const repoMeta = await githubJson<GitHubRepoResponse>(`https://api.github.com/repos/${repo.owner}/${repo.name}`, token);

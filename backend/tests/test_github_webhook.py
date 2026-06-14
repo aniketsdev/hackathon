@@ -4,9 +4,6 @@ import os
 import unittest
 from hashlib import sha256
 
-from backend.github.client import GitHubApiError, GitHubSettings, connect_repository
-from fastapi.testclient import TestClient
-
 from backend.github.client import GitHubApiError, GitHubSettings, connect_repository, normalize_repository_identifier
 from backend.github.state import DemoOperationStore, is_repository_connected, reset_state
 from backend.github.webhook import process_github_webhook, verify_signature
@@ -317,21 +314,18 @@ class GitHubWebhookTest(unittest.TestCase):
             response = connect_github_repository(
                 RepositoryConnectRequest(repositoryFullName="owner/repo"),
             )
-            url_response = client.post(
-                "/api/github/repositories",
-                json={"repositoryUrl": "https://github.com/owner/repo"},
+            url_response = connect_github_repository(
+                RepositoryConnectRequest(repositoryUrl="https://github.com/owner/repo"),
             )
-            rejected = client.post(
-                "/api/github/repositories",
-                json={"repositoryFullName": "other/repo"},
+            rejected = connect_github_repository(
+                RepositoryConnectRequest(repositoryFullName="other/repo"),
             )
         finally:
             self._restore_env("GITHUB_ALLOWED_REPOSITORIES", previous_allowed)
 
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["connectionStatus"], "connected")
-        self.assertEqual(url_response.status_code, 201)
-        self.assertEqual(url_response.json()["repositoryFullName"], "owner/repo")
+        self.assertEqual(response.connectionStatus, "connected")
+        self.assertEqual(url_response.connectionStatus, "connected")
+        self.assertEqual(url_response.repositoryFullName, "owner/repo")
         self.assertEqual(rejected.status_code, 400)
 
     def _headers(self, delivery_id: str, event: str, raw_body: bytes) -> dict[str, str]:

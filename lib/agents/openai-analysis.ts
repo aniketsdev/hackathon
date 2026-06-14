@@ -32,7 +32,7 @@ export async function requestOpenAIAnalysis(context: AiFindingContext[]): Promis
           {
             role: "system",
             content:
-              "You are a compliance review assistant. Use only the supplied redacted scanner findings. Return concise JSON with summary, complianceContext, and suggestedRemediation. Do not claim legal certification."
+              "You are a compliance review assistant. Use only the supplied redacted scanner findings. Return concise JSON with summary, complianceContext, suggestedRemediation, riskScore, and riskLevel. riskScore is 0-100 where 100 is the highest compliance/security risk. riskLevel must be low, medium, high, or critical. Do not claim legal certification."
           },
           {
             role: "user",
@@ -84,6 +84,8 @@ function normalizeAiContent(content: string): AIAnalysisResult {
 
     return {
       status: "completed",
+      riskScore: normalizeRiskScore(fields.riskScore),
+      riskLevel: normalizeRiskLevel(fields.riskLevel),
       summary: normalizeAiText(fields.summary, "AI analysis completed."),
       complianceContext: normalizeAiText(
         fields.complianceContext,
@@ -97,6 +99,8 @@ function normalizeAiContent(content: string): AIAnalysisResult {
   } catch {
     return {
       status: "completed",
+      riskScore: undefined,
+      riskLevel: undefined,
       summary: content.slice(0, 600),
       complianceContext: "Review the flagged security and privacy risks before merge.",
       suggestedRemediation: "Prioritize critical and high findings first."
@@ -106,6 +110,18 @@ function normalizeAiContent(content: string): AIAnalysisResult {
 
 function stripJsonFence(value: string) {
   return value.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+}
+
+function normalizeRiskScore(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function normalizeRiskLevel(value: unknown) {
+  if (value === "low" || value === "medium" || value === "high" || value === "critical") {
+    return value;
+  }
+  return undefined;
 }
 
 function normalizeAiText(value: unknown, fallback: string): string {

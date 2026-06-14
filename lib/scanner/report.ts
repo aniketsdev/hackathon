@@ -21,7 +21,8 @@ export function buildRiskReport(findings: Finding[], aiAnalysis?: AIAnalysisResu
   const findingCounts = buildFindingCounts(orderedFindings);
   const prComment = generatePrComment(score, orderedFindings, {
     disclaimer: COMPLIANCE_DISCLAIMER,
-    findingCounts
+    findingCounts,
+    aiAnalysis
   });
 
   return {
