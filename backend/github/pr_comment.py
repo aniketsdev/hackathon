@@ -57,7 +57,7 @@ def redact_sensitive_value(value: str) -> str:
     sanitized = value
     sanitized = re.sub(r"sk-[A-Za-z0-9_-]{8,}", "sk-[redacted]", sanitized)
     sanitized = re.sub(
-        r"(?i)(api[_-]?key|access[_-]?token|private[_-]?key|password)\s*=\s*['\"][^'\"]+['\"]",
+        r"(?i)(api[_-]?key|access[_-]?token|secret[_-]?key|client[_-]?secret|jwt[_-]?secret|private[_-]?key|password)\s*=\s*['\"][^'\"]+['\"]",
         r"\1='[redacted]'",
         sanitized,
     )

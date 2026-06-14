@@ -4,14 +4,22 @@ import os
 import unittest
 from hashlib import sha256
 
-from backend.github.client import GitHubApiError, GitHubSettings, connect_repository
 from fastapi.testclient import TestClient
 
-from backend.github.client import GitHubApiError, GitHubSettings, connect_repository, normalize_repository_identifier
+from backend.github.client import (
+    GitHubApiError,
+    GitHubSettings,
+    connect_repository,
+    content_for_added_lines,
+    content_from_patch,
+    normalize_repository_identifier,
+)
 from backend.github.state import DemoOperationStore, is_repository_connected, reset_state
 from backend.github.webhook import process_github_webhook, verify_signature
-from backend.main import connect_github_repository, get_github_operation
+from backend.main import app, connect_github_repository, get_github_operation
 from backend.models import PullRequestFileRecord, RepositoryConnectRequest, SourceFile
+
+client = TestClient(app)
 
 
 DEMO_CODE = """export async function GET(req: Request) {
@@ -144,6 +152,38 @@ class GitHubWebhookTest(unittest.TestCase):
         self.assertEqual(normalize_repository_identifier("https://github.com/owner/repo.git"), "owner/repo")
         self.assertEqual(normalize_repository_identifier("git@github.com:owner/repo.git"), "owner/repo")
         self.assertIsNone(normalize_repository_identifier("https://example.com/owner/repo"))
+
+    def test_added_line_content_preserves_line_numbers(self) -> None:
+        content = "\n".join(
+            [
+                "unchanged one",
+                "password='existing-test-password'",
+                "unchanged three",
+                'SECRET_KEY = "new-hardcoded-secret"',
+            ]
+        )
+        patch = """@@ -1,3 +1,4 @@
+ unchanged one
+ password='existing-test-password'
+ unchanged three
++SECRET_KEY = "new-hardcoded-secret"
+"""
+
+        scan_content = content_for_added_lines(content, patch)
+
+        self.assertEqual(scan_content.splitlines()[3], 'SECRET_KEY = "new-hardcoded-secret"')
+        self.assertNotIn("existing-test-password", scan_content)
+
+    def test_patch_fallback_keeps_added_line_numbers(self) -> None:
+        patch = """@@ -10,2 +10,3 @@
+ context
++SECRET_KEY = "new-hardcoded-secret"
+ next
+"""
+
+        scan_content = content_from_patch(patch)
+
+        self.assertEqual(scan_content.splitlines()[10], 'SECRET_KEY = "new-hardcoded-secret"')
 
     def test_invalid_signature_is_rejected_and_persisted(self) -> None:
         raw_body = b'{"zen":"Keep it logically awesome."}'
@@ -328,11 +368,33 @@ class GitHubWebhookTest(unittest.TestCase):
         finally:
             self._restore_env("GITHUB_ALLOWED_REPOSITORIES", previous_allowed)
 
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["connectionStatus"], "connected")
+        self.assertEqual(response.connectionStatus, "connected")
+        self.assertEqual(response.repositoryFullName, "owner/repo")
         self.assertEqual(url_response.status_code, 201)
         self.assertEqual(url_response.json()["repositoryFullName"], "owner/repo")
         self.assertEqual(rejected.status_code, 400)
+
+    def test_webhook_root_alias_and_info_routes_help_setup(self) -> None:
+        previous_secret = os.environ.get("GITHUB_WEBHOOK_SECRET")
+        os.environ["GITHUB_WEBHOOK_SECRET"] = "test-secret"
+        try:
+            info = client.get("/")
+            webhook_info = client.get("/api/github/webhook")
+            raw_body = json.dumps({"repository": {"full_name": "owner/repo"}}).encode("utf-8")
+            response = client.post(
+                "/",
+                content=raw_body,
+                headers=self._headers("delivery-root-alias", "ping", raw_body),
+            )
+        finally:
+            self._restore_env("GITHUB_WEBHOOK_SECRET", previous_secret)
+
+        self.assertEqual(info.status_code, 200)
+        self.assertEqual(info.json()["githubWebhookPath"], "/api/github/webhook")
+        self.assertEqual(webhook_info.status_code, 200)
+        self.assertEqual(webhook_info.json()["method"], "POST")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ignored")
 
     def _headers(self, delivery_id: str, event: str, raw_body: bytes) -> dict[str, str]:
         signature = hmac.new(b"test-secret", raw_body, sha256).hexdigest()
