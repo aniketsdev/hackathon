@@ -63,6 +63,8 @@ def detect_hardcoded_secret(line: str) -> bool:
         re.search(r"sk-[a-zA-Z0-9_-]{8,}", line) is not None
         or re.search(r"api[_-]?key\s*=\s*[\"'][^\"']+[\"']", line, re.IGNORECASE) is not None
         or re.search(r"access[_-]?token\s*=\s*[\"'][^\"']+[\"']", line, re.IGNORECASE) is not None
+        or re.search(r"(secret[_-]?key|client[_-]?secret|jwt[_-]?secret)\s*=\s*[\"'][^\"']{8,}[\"']", line, re.IGNORECASE)
+        is not None
         or re.search(r"private[_-]?key\s*=\s*[\"'][^\"']+[\"']", line, re.IGNORECASE) is not None
         or re.search(r"password\s*=\s*[\"'][^\"']+[\"']", line, re.IGNORECASE) is not None
     )

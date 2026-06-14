@@ -41,6 +41,15 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "status": "ok",
+        "service": "ComplyPatch AI API",
+        "githubWebhookPath": "/api/github/webhook",
+    }
+
+
 @app.post("/api/scans", response_model=ScanResponse)
 def create_scan(request: ScanRequest) -> ScanResponse:
     findings = scan_files(request.files)
@@ -74,6 +83,24 @@ def connect_github_repository(request: RepositoryConnectRequest) -> ConnectedRep
 
 @app.post("/api/github/webhook", response_model=WebhookAck)
 async def github_webhook(request: Request) -> JSONResponse:
+    return await process_github_webhook_request(request)
+
+
+@app.get("/api/github/webhook")
+def github_webhook_info() -> dict[str, str]:
+    return {
+        "status": "ready",
+        "method": "POST",
+        "message": "Configure GitHub webhooks to POST JSON deliveries to this path.",
+    }
+
+
+@app.post("/", response_model=WebhookAck)
+async def github_webhook_root_alias(request: Request) -> JSONResponse:
+    return await process_github_webhook_request(request)
+
+
+async def process_github_webhook_request(request: Request) -> JSONResponse:
     status_code, response = process_github_webhook(
         await request.body(),
         request.headers,

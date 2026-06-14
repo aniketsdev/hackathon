@@ -65,6 +65,7 @@ function detectHardcodedSecret(line: string) {
     || /api[_-]?key\s*=\s*["'][^"']+["']/i.test(line)
     || /api[_-]?key\s*[:=]\s*["'][^"']+["']/i.test(line)
     || /access[_-]?token\s*=\s*["'][^"']+["']/i.test(line)
+    || /(secret[_-]?key|client[_-]?secret|jwt[_-]?secret)\s*=\s*["'][^"']{8,}["']/i.test(line)
     || /private[_-]?key\s*=\s*["'][^"']+["']/i.test(line)
     || /password\s*=\s*["'][^"']+["']/i.test(line);
 }

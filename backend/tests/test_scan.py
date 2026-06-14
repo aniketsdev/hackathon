@@ -45,6 +45,31 @@ class ScanFilesTest(unittest.TestCase):
         )
         self.assertEqual(calculate_score(findings), 1)
 
+    def test_python_secret_key_literal_is_flagged(self) -> None:
+        findings = scan_files(
+            [
+                SourceFile(
+                    path="settings.py",
+                    content='SECRET_KEY = "hxjsskdkjdkjdkjdkddkdjkdjkj"',
+                )
+            ]
+        )
+
+        self.assertEqual([finding.ruleId for finding in findings], ["RULE-001"])
+        self.assertEqual(findings[0].severity, "Critical")
+
+    def test_environment_secret_lookup_is_not_flagged(self) -> None:
+        findings = scan_files(
+            [
+                SourceFile(
+                    path="settings.py",
+                    content='SECRET_KEY = os.getenv("SECRET_KEY")',
+                )
+            ]
+        )
+
+        self.assertEqual(findings, [])
+
 
 if __name__ == "__main__":
     unittest.main()

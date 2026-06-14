@@ -39,18 +39,18 @@ class GitHubSettings:
 
     @classmethod
     def from_env(cls) -> "GitHubSettings":
-        load_dotenv()
+        env = load_runtime_env()
         allowed = {
             item.strip().lower()
-            for item in os.environ.get("GITHUB_ALLOWED_REPOSITORIES", "").split(",")
+            for item in env.get("GITHUB_ALLOWED_REPOSITORIES", "").split(",")
             if item.strip()
         }
         return cls(
-            webhook_secret=os.environ.get("GITHUB_WEBHOOK_SECRET") or None,
-            token=os.environ.get("GITHUB_TOKEN") or None,
-            post_comments=os.environ.get("GITHUB_POST_COMMENTS", "").lower() in {"1", "true", "yes", "on"},
+            webhook_secret=env.get("GITHUB_WEBHOOK_SECRET") or None,
+            token=env.get("GITHUB_TOKEN") or None,
+            post_comments=env.get("GITHUB_POST_COMMENTS", "").lower() in {"1", "true", "yes", "on"},
             allowed_repositories=allowed,
-            api_base_url=os.environ.get("GITHUB_API_BASE_URL", "https://api.github.com").rstrip("/"),
+            api_base_url=env.get("GITHUB_API_BASE_URL", "https://api.github.com").rstrip("/"),
         )
 
     def allows_repository(self, full_name: str) -> bool:
@@ -76,6 +76,7 @@ class GitHubClient:
         for file_data in files[:MAX_SCAN_FILES]:
             path = file_data.get("filename") or ""
             status = file_data.get("status") or "unknown"
+            patch = file_data.get("patch")
             if not path:
                 skipped.append(SkippedFile(path="unknown", reason="Missing file path"))
                 continue
@@ -86,7 +87,7 @@ class GitHubClient:
             content = self.get_file_content(owner, repo, path, head_sha)
             source = "full"
             if content is None:
-                content = file_data.get("patch")
+                content = patch
                 source = "patch"
 
             if not content:
@@ -97,7 +98,15 @@ class GitHubClient:
                 skipped.append(SkippedFile(path=path, reason="File exceeds scan size limit"))
                 continue
 
-            selected.append(SourceFile(path=path, content=content))
+            scan_content = content
+            if isinstance(patch, str) and patch:
+                scan_content = content_for_added_lines(content, patch) if source == "full" else content_from_patch(patch)
+                if not scan_content.strip():
+                    skipped.append(SkippedFile(path=path, reason="No added lines to scan"))
+                    records.append(PullRequestFileRecord(path=path, status=status, contentSource=source, content=content))
+                    continue
+
+            selected.append(SourceFile(path=path, content=scan_content))
             records.append(PullRequestFileRecord(path=path, status=status, contentSource=source, content=content))
 
         for file_data in files[MAX_SCAN_FILES:]:
@@ -251,11 +260,96 @@ def normalize_repository_full_name(value: str) -> str | None:
     return normalize_repository_identifier(value)
 
 
-def load_dotenv(path: str | Path = ".env") -> None:
+def content_for_added_lines(content: str, patch: str) -> str:
+    content_lines = content.splitlines()
+    added_lines = extract_added_line_numbers(patch)
+    if not added_lines:
+        return ""
+
+    sparse_lines = [""] * max(added_lines)
+    for line_number in added_lines:
+        if line_number <= len(content_lines):
+            sparse_lines[line_number - 1] = content_lines[line_number - 1]
+
+    return "\n".join(sparse_lines)
+
+
+def content_from_patch(patch: str) -> str:
+    added: dict[int, str] = {}
+    new_line = 0
+
+    for line in patch.splitlines():
+        match = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+        if match:
+            new_line = int(match.group(1))
+            continue
+        if line.startswith("+++") or line.startswith("\\"):
+            continue
+        if line.startswith("+"):
+            added[new_line] = line[1:]
+            new_line += 1
+        elif line.startswith(" "):
+            new_line += 1
+
+    if not added:
+        return ""
+
+    sparse_lines = [""] * max(added)
+    for line_number, value in added.items():
+        sparse_lines[line_number - 1] = value
+
+    return "\n".join(sparse_lines)
+
+
+def extract_added_line_numbers(patch: str) -> set[int]:
+    added: set[int] = set()
+    new_line = 0
+
+    for line in patch.splitlines():
+        match = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+        if match:
+            new_line = int(match.group(1))
+            continue
+        if line.startswith("+++") or line.startswith("\\"):
+            continue
+        if line.startswith("+"):
+            added.add(new_line)
+            new_line += 1
+        elif line.startswith(" "):
+            new_line += 1
+
+    return added
+
+
+def load_runtime_env() -> dict[str, str]:
+    root_env = read_dotenv(".env")
+    backend_env = read_dotenv("backend/.env")
+    keys = set(root_env) | set(backend_env) | set(os.environ)
+    values: dict[str, str] = {}
+
+    for key in keys:
+        current = os.environ.get(key)
+        root_value = root_env.get(key)
+        backend_value = backend_env.get(key)
+
+        if current is not None and current != root_value:
+            values[key] = current
+        elif backend_value is not None:
+            values[key] = backend_value
+        elif current is not None:
+            values[key] = current
+        elif root_value is not None:
+            values[key] = root_value
+
+    return values
+
+
+def read_dotenv(path: str | Path) -> dict[str, str]:
     env_path = Path(path)
     if not env_path.exists():
-        return
+        return {}
 
+    values: dict[str, str] = {}
     for raw_line in env_path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -263,7 +357,14 @@ def load_dotenv(path: str | Path = ".env") -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
+        if key:
+            values[key] = value
+    return values
+
+
+def load_dotenv(path: str | Path = ".env") -> None:
+    for key, value in read_dotenv(path).items():
+        if key not in os.environ:
             os.environ[key] = value
 
 
