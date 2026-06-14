@@ -1,4 +1,6 @@
-import { Finding, SourceFile, ruleCatalog } from "./rules";
+import { redactEvidence } from "./redaction";
+import { ruleCatalog } from "./rules";
+import type { Finding, SourceFile } from "./types";
 
 export function scanFiles(files: SourceFile[]): Finding[] {
   const findings: Finding[] = [];
@@ -42,22 +44,26 @@ export function scanFiles(files: SourceFile[]): Finding[] {
 
 function createFinding(ruleId: keyof typeof ruleCatalog, file: string, line: number, evidence: string): Finding {
   const rule = ruleCatalog[ruleId];
+  const redacted = redactEvidence(evidence);
 
   return {
     ruleId,
     title: rule.title,
     severity: rule.severity,
+    category: rule.category,
     file,
     line,
-    evidence,
+    evidence: redacted.value,
     impact: rule.impact,
-    fix: rule.fix
+    fix: rule.fix,
+    masked: redacted.masked
   };
 }
 
 function detectHardcodedSecret(line: string) {
   return /sk-[a-zA-Z0-9_-]{8,}/.test(line)
     || /api[_-]?key\s*=\s*["'][^"']+["']/i.test(line)
+    || /api[_-]?key\s*[:=]\s*["'][^"']+["']/i.test(line)
     || /access[_-]?token\s*=\s*["'][^"']+["']/i.test(line)
     || /private[_-]?key\s*=\s*["'][^"']+["']/i.test(line)
     || /password\s*=\s*["'][^"']+["']/i.test(line);
@@ -76,7 +82,7 @@ function detectUnsafeSql(line: string) {
 }
 
 function detectWildcardCors(line: string) {
-  return /Access-Control-Allow-Origin/i.test(line) && /["']\*["']/.test(line);
+  return /(Access-Control-Allow-Origin|allowOrigins?|origin)/i.test(line) && /["']\*["']/.test(line);
 }
 
 function detectInsecureCookie(line: string, content: string) {
