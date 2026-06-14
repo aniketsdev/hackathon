@@ -23,6 +23,8 @@ Optional Fix Suggestion
 - Frontend and API routes: Next.js
 - Scanner: TypeScript deterministic rules in `lib/scanner`
 - PR comment formatter: TypeScript markdown generator in `lib/github`
+- Backend API: FastAPI in `backend`
+- Backend scanner: Python deterministic rules in `backend/scanner`
 - Database: none yet
 - GitHub posting: mocked unless explicitly wired later
 
@@ -51,8 +53,15 @@ This is enough for the first working hackathon demo. Keep it stable while the Fa
 - `POST /api/scans`
 - Accepts changed files or pasted code.
 - Runs the scanner.
-- Stores scan result and findings in PostgreSQL.
+- Stores scan result and findings in PostgreSQL after the persistence slice is added.
 - Returns score, evidence, findings, and GitHub-style PR comment.
+
+### Current FastAPI Scan API
+- `backend/main.py`
+- `POST /api/scans`
+- `POST /api/scan` alias for easier local migration
+- `GET /health`
+- Returns the same JSON shape as the current Next.js scan endpoint.
 
 ### Scanner
 - `lib/scanner/rules.ts`
@@ -110,8 +119,8 @@ Do not store real secrets or full sensitive patient data in PostgreSQL. Store ma
 ## Migration Order
 
 1. Keep the current Next.js demo working.
-2. Add a FastAPI app with `POST /api/scans`.
-3. Port scanner rules to the FastAPI backend.
+2. Add a FastAPI app with `POST /api/scans`. Done.
+3. Port scanner rules to the FastAPI backend. Done.
 4. Add PostgreSQL persistence for scan runs and findings.
 5. Point the frontend scan button at FastAPI.
 6. Add optional GitHub webhook and PR comment posting.

@@ -12,6 +12,10 @@
 - [x] Add 6 rule checks
 - [x] Generate risk score
 - [x] Generate PR comment markdown
+- [x] Add FastAPI scan endpoint
+- [x] Port scanner rules to FastAPI backend
+- [ ] Add PostgreSQL scan run persistence
+- [ ] Point frontend scan button to FastAPI backend
 - [ ] Add real GitHub webhook
 - [ ] Add GitHub PR comment posting
 

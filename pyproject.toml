@@ -1,0 +1,12 @@
+[project]
+name = "complypatch-ai-backend"
+version = "0.1.0"
+description = "FastAPI backend for the ComplyPatch AI hackathon demo."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "uvicorn[standard]>=0.32,<1.0"
+]
+
+[tool.uv]
+package = false
