@@ -16,7 +16,7 @@ ComplyPatch AI reviews code like a compliance engineer.
 3. View the compliance score.
 4. View evidence-based findings.
 5. Copy the generated GitHub PR comment.
-6. Optional: connect the `/api/scan` endpoint to a GitHub webhook.
+6. Optional: connect a GitHub repository and receive signed PR webhooks.
 
 ## Quick Start
 
@@ -40,19 +40,13 @@ uv sync
 uv run uvicorn backend.main:app --reload --port 8000
 ```
 
-PostgreSQL for GitHub webhook operations:
-
-```bash
-docker run --name complypatch-postgres -e POSTGRES_USER=complypatch -e POSTGRES_PASSWORD=complypatch -e POSTGRES_DB=complypatch -p 55432:5432 -d postgres:16
-```
-
 Set local environment values in `.env`:
 
 ```text
-DATABASE_URL=<postgresql-connection-url>
 GITHUB_WEBHOOK_SECRET=dev-webhook-secret-change-me
 GITHUB_POST_COMMENTS=false
 GITHUB_ALLOWED_REPOSITORIES=owner/repo
+GITHUB_TOKEN=
 ```
 
 Open:
@@ -70,6 +64,7 @@ POST http://localhost:8000/api/scans
 GitHub webhook endpoints:
 
 ```text
+POST http://localhost:8000/api/github/repositories
 POST http://localhost:8000/api/github/webhook
 GET http://localhost:8000/api/github/operations/{delivery_id}
 ```
@@ -88,10 +83,10 @@ uv run python -m unittest discover backend/tests
 
 ## Environment
 
-Copy `.env.example` to `.env.local`:
+Copy `.env.example` to `.env` for the FastAPI backend:
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
 For the first demo, OpenAI and GitHub tokens are optional because the scanner works locally.
@@ -105,7 +100,9 @@ For the first demo, OpenAI and GitHub tokens are optional because the scanner wo
 - GitHub PR comment generator
 - API endpoint for scanning code
 - FastAPI scan API with matching response shape
-- PostgreSQL-backed GitHub webhook receiver and operation status
+- GitHub webhook receiver with signed delivery verification
+- PR comment preview/post/update flow
+- In-memory operation status for demo delivery tracking
 
 ## Not Legal Advice
 

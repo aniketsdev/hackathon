@@ -4,10 +4,13 @@ import os
 import unittest
 from hashlib import sha256
 
-from backend.github.client import GitHubSettings
-from backend.github.operations import PostgresOperationStore
-from backend.github.webhook import process_github_webhook
-from backend.models import PullRequestFileRecord, SourceFile
+from fastapi.testclient import TestClient
+
+from backend.github.client import GitHubApiError, GitHubSettings, connect_repository
+from backend.github.state import DemoOperationStore, is_repository_connected, reset_state
+from backend.github.webhook import process_github_webhook, verify_signature
+from backend.main import app
+from backend.models import PullRequestFileRecord, RepositoryConnectRequest, SourceFile
 
 
 DEMO_CODE = """export async function GET(req: Request) {
@@ -68,8 +71,6 @@ class FakeGitHubClient:
         marker: str,
     ):
         if self.fail:
-            from backend.github.client import GitHubApiError
-
             raise GitHubApiError("GitHub API failed: 403 token github-token-should-not-leak")
         self.comment_body = body
         return {
@@ -81,23 +82,40 @@ class FakeGitHubClient:
 
 class GitHubWebhookTest(unittest.TestCase):
     def setUp(self) -> None:
-        database_url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
-        if not database_url:
-            self.skipTest("DATABASE_URL or TEST_DATABASE_URL is required for PostgreSQL webhook tests")
-
-        self.store = PostgresOperationStore(database_url)
-        try:
-            self.store.ensure_schema()
-            self.store.clear_all()
-        except Exception as exc:  # pragma: no cover - environment guard
-            self.skipTest(f"PostgreSQL is not available: {exc}")
-
+        reset_state()
+        self.store = DemoOperationStore()
         self.settings = GitHubSettings(
             webhook_secret="test-secret",
             token=None,
             post_comments=False,
             allowed_repositories={"owner/repo"},
         )
+
+    def tearDown(self) -> None:
+        reset_state()
+
+    def test_signature_verification_accepts_valid_signature(self) -> None:
+        raw_body = b'{"zen":"Keep it logically awesome."}'
+        signature = "sha256=" + hmac.new(b"test-secret", raw_body, sha256).hexdigest()
+
+        self.assertTrue(verify_signature(raw_body, signature, "test-secret"))
+        self.assertFalse(verify_signature(raw_body, "sha256=bad", "test-secret"))
+
+    def test_repository_connection_success_and_rejection(self) -> None:
+        connected = connect_repository(
+            RepositoryConnectRequest(repositoryFullName="owner/repo"),
+            settings=self.settings,
+        )
+        rejected = connect_repository(
+            RepositoryConnectRequest(repositoryFullName="other/repo"),
+            settings=self.settings,
+        )
+
+        self.assertEqual(connected.connectionStatus, "connected")
+        self.assertEqual(connected.permissionsStatus, "read_only")
+        self.assertTrue(is_repository_connected("owner/repo"))
+        self.assertEqual(rejected.connectionStatus, "failed")
+        self.assertEqual(rejected.message, "Repository is not allowed")
 
     def test_invalid_signature_is_rejected_and_persisted(self) -> None:
         raw_body = b'{"zen":"Keep it logically awesome."}'
@@ -217,28 +235,75 @@ class GitHubWebhookTest(unittest.TestCase):
         self.assertNotIn("github-demo-token", operation.outbound.failureReason)
         self.assertNotIn("github-token-should-not-leak", operation.outbound.failureReason)
 
-    def test_repository_allowlist_rejects_unapproved_repo(self) -> None:
-        payload = self._pull_request_payload(repository="other/repo")
+    def test_repository_gate_rejects_unconnected_repo_without_allowlist(self) -> None:
+        payload = self._pull_request_payload(repository="owner/repo")
         raw_body = json.dumps(payload).encode("utf-8")
+        settings = GitHubSettings(
+            webhook_secret="test-secret",
+            token=None,
+            post_comments=False,
+            allowed_repositories=set(),
+        )
 
         status_code, response = process_github_webhook(
             raw_body,
-            self._headers("delivery-other", "pull_request", raw_body),
+            self._headers("delivery-unconnected", "pull_request", raw_body),
             store=self.store,
-            settings=self.settings,
+            settings=settings,
             client=FakeGitHubClient(),
         )
 
-        operation = self.store.get_operation("delivery-other")
+        operation = self.store.get_operation("delivery-unconnected")
 
         self.assertEqual(status_code, 403)
         self.assertEqual(response.status, "rejected")
         self.assertEqual(operation.delivery.status, "rejected")
-        self.assertEqual(operation.delivery.rejectionReason, "Repository is not allowed")
+        self.assertEqual(operation.delivery.rejectionReason, "Repository is not connected")
         self.assertIsNone(operation.scan)
 
-    def test_missing_operation_returns_none(self) -> None:
-        self.assertIsNone(self.store.get_operation("missing-delivery"))
+    def test_operation_status_route_returns_success_and_missing(self) -> None:
+        client = TestClient(app)
+        previous_secret = os.environ.get("GITHUB_WEBHOOK_SECRET")
+        previous_allowed = os.environ.get("GITHUB_ALLOWED_REPOSITORIES")
+        os.environ["GITHUB_WEBHOOK_SECRET"] = "test-secret"
+        os.environ["GITHUB_ALLOWED_REPOSITORIES"] = "owner/repo"
+        try:
+            raw_body = json.dumps({"repository": {"full_name": "owner/repo"}}).encode("utf-8")
+            response = client.post(
+                "/api/github/webhook",
+                content=raw_body,
+                headers=self._headers("delivery-route", "ping", raw_body),
+            )
+            status = client.get("/api/github/operations/delivery-route")
+            missing = client.get("/api/github/operations/missing")
+        finally:
+            self._restore_env("GITHUB_WEBHOOK_SECRET", previous_secret)
+            self._restore_env("GITHUB_ALLOWED_REPOSITORIES", previous_allowed)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(status.status_code, 200)
+        self.assertEqual(status.json()["delivery"]["status"], "ignored")
+        self.assertEqual(missing.status_code, 404)
+
+    def test_repository_connection_route_connects_allowed_repo(self) -> None:
+        client = TestClient(app)
+        previous_allowed = os.environ.get("GITHUB_ALLOWED_REPOSITORIES")
+        os.environ["GITHUB_ALLOWED_REPOSITORIES"] = "owner/repo"
+        try:
+            response = client.post(
+                "/api/github/repositories",
+                json={"repositoryFullName": "owner/repo"},
+            )
+            rejected = client.post(
+                "/api/github/repositories",
+                json={"repositoryFullName": "other/repo"},
+            )
+        finally:
+            self._restore_env("GITHUB_ALLOWED_REPOSITORIES", previous_allowed)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["connectionStatus"], "connected")
+        self.assertEqual(rejected.status_code, 400)
 
     def _headers(self, delivery_id: str, event: str, raw_body: bytes) -> dict[str, str]:
         signature = hmac.new(b"test-secret", raw_body, sha256).hexdigest()
@@ -257,6 +322,12 @@ class GitHubWebhookTest(unittest.TestCase):
                 "head": {"sha": "abc123"},
             },
         }
+
+    def _restore_env(self, key: str, value: str | None) -> None:
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
 
 
 if __name__ == "__main__":

@@ -3,11 +3,18 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.agents.compliance_agent import generate_summary
-from backend.db import DatabaseNotConfigured
+from backend.github.client import connect_repository
 from backend.github.pr_comment import generate_pr_comment
-from backend.github.operations import PostgresOperationStore
+from backend.github.state import DemoOperationStore
 from backend.github.webhook import process_github_webhook
-from backend.models import GitHubOperationResponse, ScanRequest, ScanResponse, WebhookAck
+from backend.models import (
+    ConnectedRepositoryResponse,
+    GitHubOperationResponse,
+    RepositoryConnectRequest,
+    ScanRequest,
+    ScanResponse,
+    WebhookAck,
+)
 from backend.scanner.scan import scan_files
 from backend.scanner.scoring import calculate_score
 
@@ -54,6 +61,17 @@ def create_scan_alias(request: ScanRequest) -> ScanResponse:
     return create_scan(request)
 
 
+@app.post("/api/github/repositories", response_model=ConnectedRepositoryResponse, status_code=201)
+def connect_github_repository(request: RepositoryConnectRequest) -> ConnectedRepositoryResponse | JSONResponse:
+    response = connect_repository(request)
+    if response.connectionStatus != "connected":
+        return JSONResponse(
+            status_code=400,
+            content={"message": response.message or "Repository could not be connected"},
+        )
+    return response
+
+
 @app.post("/api/github/webhook", response_model=WebhookAck)
 async def github_webhook(request: Request) -> JSONResponse:
     status_code, response = process_github_webhook(
@@ -64,16 +82,9 @@ async def github_webhook(request: Request) -> JSONResponse:
 
 
 @app.get("/api/github/operations/{delivery_id}", response_model=GitHubOperationResponse)
-def get_github_operation(delivery_id: str) -> GitHubOperationResponse:
-    try:
-        store = PostgresOperationStore()
-        store.ensure_schema()
-        operation = store.get_operation(delivery_id)
-    except DatabaseNotConfigured:
-        return JSONResponse(
-            status_code=503,
-            content={"message": "DATABASE_URL is required for GitHub operation status"},
-        )
+def get_github_operation(delivery_id: str) -> GitHubOperationResponse | JSONResponse:
+    store = DemoOperationStore()
+    operation = store.get_operation(delivery_id)
 
     if operation is None:
         return JSONResponse(status_code=404, content={"message": "Delivery not found"})

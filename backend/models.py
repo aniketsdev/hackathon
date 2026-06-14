@@ -6,6 +6,8 @@ Severity = Literal["Critical", "High", "Medium", "Low"]
 DeliveryStatus = Literal["received", "ignored", "rejected", "processing", "completed", "failed"]
 OutboundMode = Literal["post", "update", "preview"]
 OutboundStatus = Literal["not_configured", "pending", "posted", "updated", "failed"]
+RepositoryConnectionStatus = Literal["connected", "failed"]
+RepositoryPermissionsStatus = Literal["unknown", "read_only", "read_write"]
 
 
 class SourceFile(BaseModel):
@@ -39,6 +41,18 @@ class WebhookAck(BaseModel):
     deliveryId: str | None = None
     status: str
     message: str
+
+
+class RepositoryConnectRequest(BaseModel):
+    repositoryFullName: str = Field(min_length=3, max_length=300)
+    installationId: int | None = Field(default=None, ge=1)
+
+
+class ConnectedRepositoryResponse(BaseModel):
+    repositoryFullName: str
+    connectionStatus: RepositoryConnectionStatus
+    permissionsStatus: RepositoryPermissionsStatus
+    message: str | None = None
 
 
 class PullRequestFileRecord(BaseModel):
