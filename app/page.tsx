@@ -47,6 +47,18 @@ type SourceSnapshot = {
   preview: string;
 };
 
+type SkippedSummary = {
+  title: string;
+  items: string[];
+  extraCount: number;
+};
+
+type AiStatusView = {
+  title: string;
+  lines: string[];
+  tone: "done" | "steady" | "warn";
+};
+
 const MAX_BROWSER_SCAN_FILES = 50;
 const MAX_BROWSER_FILE_CHARS = 200_000;
 
@@ -127,6 +139,8 @@ export default function Home() {
     if (!result || result.error || !Array.isArray(result.findings)) return null;
     return result.findings.find((finding) => findingKey(finding) === activeFindingKey) ?? result.findings[0] ?? null;
   }, [activeFindingKey, result]);
+  const skippedSummary = useMemo(() => summarizeSkipped(result?.skipped), [result?.skipped]);
+  const aiStatus = useMemo(() => summarizeAiStatus(result?.aiAnalysis), [result?.aiAnalysis]);
 
   async function runDemoScan() {
     await runScan(
@@ -496,25 +510,36 @@ export default function Home() {
                 })}
               </div>
 
-              {Boolean(result.skipped?.length) && (
-                <section className="analysis-block">
-                  <span className="eyebrow">Skipped</span>
-                  <p>{result.skipped?.slice(0, 4).join(" | ")}</p>
+              {skippedSummary && (
+                <section className="analysis-block compact-status">
+                  <div className="status-heading">
+                    <span className="eyebrow">Skipped</span>
+                    <strong>{skippedSummary.title}</strong>
+                  </div>
+                  <div className="status-list">
+                    {skippedSummary.items.map((item) => (
+                      <span className="status-chip" key={item} title={item}>
+                        {item}
+                      </span>
+                    ))}
+                    {skippedSummary.extraCount > 0 && (
+                      <span className="status-chip">+{skippedSummary.extraCount} more</span>
+                    )}
+                  </div>
                 </section>
               )}
 
-              {result.aiAnalysis && result.aiAnalysis.status !== "skipped" && (
-                <section className="analysis-block">
-                  <span className="eyebrow">AI analysis</span>
-                  <strong>{result.aiAnalysis.status}</strong>
-                  {renderOptionalText(result.aiAnalysis.summary) && <p>{renderOptionalText(result.aiAnalysis.summary)}</p>}
-                  {renderOptionalText(result.aiAnalysis.complianceContext) && (
-                    <p>{renderOptionalText(result.aiAnalysis.complianceContext)}</p>
-                  )}
-                  {renderOptionalText(result.aiAnalysis.suggestedRemediation) && (
-                    <p>{renderOptionalText(result.aiAnalysis.suggestedRemediation)}</p>
-                  )}
-                  {renderOptionalText(result.aiAnalysis.errorMessage) && <p>{renderOptionalText(result.aiAnalysis.errorMessage)}</p>}
+              {aiStatus && (
+                <section className={`analysis-block compact-status ai-status-${aiStatus.tone}`}>
+                  <div className="status-heading">
+                    <span className="eyebrow">AI analysis</span>
+                    <strong>{aiStatus.title}</strong>
+                  </div>
+                  {aiStatus.lines.map((line) => (
+                    <p className="status-copy" key={line}>
+                      {line}
+                    </p>
+                  ))}
                 </section>
               )}
             </>
@@ -551,12 +576,59 @@ function getBrowserFilePath(file: File) {
   return relativePath || file.name;
 }
 
-function renderOptionalText(value: unknown): string {
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (Array.isArray(value)) return value.map(renderOptionalText).filter(Boolean).join(" ");
-  if (value && typeof value === "object") return JSON.stringify(value);
-  return "";
+function summarizeSkipped(skipped?: string[]): SkippedSummary | null {
+  if (!skipped?.length) return null;
+
+  const compactItems = Array.from(new Set(skipped.map(compactSkippedMessage))).slice(0, 4);
+  return {
+    title: `${skipped.length} skipped ${skipped.length === 1 ? "entry" : "entries"}`,
+    items: compactItems,
+    extraCount: Math.max(0, skipped.length - compactItems.length)
+  };
+}
+
+function compactSkippedMessage(message: string) {
+  const compact = message.replace(/\s+/g, " ").trim();
+  if (/scan limit reached after 50 GitHub files/i.test(compact)) return "50-file GitHub demo limit reached";
+  if (/scan limit reached after 50 browser-selected files/i.test(compact)) return "50-file browser demo limit reached";
+  if (compact.length <= 86) return compact;
+  return `${compact.slice(0, 83)}...`;
+}
+
+function summarizeAiStatus(aiAnalysis?: AIAnalysisResult): AiStatusView | null {
+  if (!aiAnalysis || aiAnalysis.status === "skipped") return null;
+
+  if (aiAnalysis.status === "completed") {
+    return {
+      title: "Completed",
+      tone: "done",
+      lines: [
+        aiAnalysis.summary,
+        aiAnalysis.complianceContext,
+        aiAnalysis.suggestedRemediation
+      ].filter(Boolean) as string[]
+    };
+  }
+
+  if (aiAnalysis.status === "not_configured") {
+    return {
+      title: "Unavailable",
+      tone: "steady",
+      lines: [
+        aiAnalysis.errorMessage ||
+          "AI analysis is not configured. Scanner findings and the PR comment are still available."
+      ]
+    };
+  }
+
+  return {
+    title: "Unavailable",
+    tone: "warn",
+    lines: [
+      aiAnalysis.errorMessage ||
+        "AI analysis could not complete. Scanner findings and the PR comment are still available."
+    ]
+  };
 }
 
 function MetricCard({

@@ -11,9 +11,7 @@ uv sync
 uv run uvicorn backend.main:app --reload --port 8000
 ```
 
-If your shell is already in `backend/`, run `cd ..` first.
-
-GitHub webhook operation status uses bounded in-memory demo state. Restarting the backend clears connected repositories and delivery history.
+GitHub webhook operation status can use Postgres for production-style persistence. Use memory mode only for isolated local tests.
 
 ```text
 GITHUB_WEBHOOK_SECRET=dev-webhook-secret-change-me
@@ -21,6 +19,8 @@ GITHUB_POST_COMMENTS=false
 GITHUB_ALLOWED_REPOSITORIES=
 GITHUB_API_BASE_URL=https://api.github.com
 GITHUB_TOKEN=
+GITHUB_OPERATION_STORE=postgres
+DATABASE_URL=postgresql://user:password@localhost:5432/complypatch
 ```
 
 Health check:
@@ -75,3 +75,5 @@ uv run python -m unittest discover backend/tests
 ## GitHub Webhook Notes
 
 Configure a repository webhook or GitHub App webhook to call `/api/github/webhook` with JSON payloads and the same secret as `GITHUB_WEBHOOK_SECRET`. Leave `GITHUB_POST_COMMENTS=false` for a safe preview-only demo. Set `GITHUB_POST_COMMENTS=true` and provide `GITHUB_TOKEN` only when you want the backend to create or update a real PR comment.
+
+When `GITHUB_OPERATION_STORE=postgres`, the backend initializes the required tables on first webhook or operation-status request and stores deliveries, skipped files, scan results, outbound comment status, and connected repositories in Postgres.

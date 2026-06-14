@@ -43,9 +43,17 @@ export async function requestOpenAIAnalysis(context: AiFindingContext[]): Promis
     });
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return {
+          status: "not_configured",
+          errorMessage:
+            "AI analysis is unavailable because the configured OpenAI key was rejected. Scanner findings and the PR comment are still available."
+        };
+      }
+
       return {
         status: "failed",
-        errorMessage: `OpenAI request failed with status ${response.status}.`
+        errorMessage: `AI analysis is temporarily unavailable. OpenAI returned status ${response.status}. Scanner findings and the PR comment are still available.`
       };
     }
 
@@ -59,7 +67,10 @@ export async function requestOpenAIAnalysis(context: AiFindingContext[]): Promis
   } catch (error) {
     return {
       status: "failed",
-      errorMessage: error instanceof Error ? error.message : "OpenAI request failed."
+      errorMessage:
+        error instanceof Error
+          ? `AI analysis is temporarily unavailable: ${error.message}`
+          : "AI analysis is temporarily unavailable. Scanner findings and the PR comment are still available."
     };
   } finally {
     clearTimeout(timeout);
