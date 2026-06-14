@@ -108,7 +108,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [enableAiAnalysis, setEnableAiAnalysis] = useState(false);
   const [localPath, setLocalPath] = useState("./demo-vulnerable-repo");
-  const [githubUrl, setGithubUrl] = useState("https://github.com/aniketsdev/cafc-backend");
+  const [githubUrl, setGithubUrl] = useState("https://github.com/aniketsdev/example-test.git");
   const [githubRef, setGithubRef] = useState("");
   const [privateRepo, setPrivateRepo] = useState(false);
   const [attachedSummary, setAttachedSummary] = useState("No browser files selected");
