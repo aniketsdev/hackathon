@@ -1,0 +1,49 @@
+[span] CompliPatch
+[a] Workflow
+[a] Open console
+[span] AI compliance gate for GitHub
+[h1] Stop risky PRs before they merge.
+[p] CompliPatch watches GitHub webhooks, scans changed code, scores compliance risk, and writes the exact PR comment your team can act on.
+[a] Open console
+[a] See workflow
+[span] Problem
+[p] AI can ship code at midnight. Compliance still needs evidence before merge.
+[span] github.com/aniketsdev/cafc-backend
+[strong] blocking
+[span] Pull request #128
+[strong] Patient export route
+[p] 3 changed files scanned from webhook delivery.
+[span] RULE-001
+[strong] Hardcoded secret
+[code] patient-export.ts:2
+[span] RULE-002
+[strong] Patient data logging
+[code] patient-export.ts:11
+[span] RULE-004
+[strong] Unsafe SQL construction
+[code] patient-export.ts:13
+[span] score
+[p] Do not merge. Critical evidence requires remediation.
+[span] Why it exists
+[h2] The review gap is no longer style. It is proof.
+[p] Agent-written code moves faster than human compliance review.
+[p] Sensitive evidence gets buried inside ordinary diffs.
+[p] Merge decisions need proof, not another vague warning.
+[strong] Webhook arrives
+[p] A PR opens from Codex, Claude, an IDE, or GitHub.
+[strong] Evidence is scanned
+[p] Secrets, PHI logs, auth gaps, SQL, cookies, and CORS are checked.
+[strong] Risk is scored
+[p] Deterministic findings become an AI-assisted merge signal.
+[strong] Review is posted
+[p] One GitHub-style comment gives evidence, impact, and fix guidance.
+[span] What ships
+[h2] Webhook in. Evidence out. Merge decision clear.
+[strong] Deterministic checks
+[p] Stable scanner rules catch the six risks this demo must not miss.
+[strong] AI risk language
+[p] Optional AI turns findings into reviewer-ready context and priority.
+[strong] GitHub-native output
+[p] Preview locally, then post or update the PR comment when credentials are enabled.
+[h2] Start with a demo PR. Then connect the webhook.
+[a] Open console

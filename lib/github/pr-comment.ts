@@ -1,15 +1,22 @@
-import type { Finding, FindingCounts } from "@/lib/scanner/types";
+import type { AIAnalysisResult, Finding, FindingCounts } from "@/lib/scanner/types";
 
 export function generatePrComment(
   score: number,
   findings: Finding[],
-  options: { disclaimer?: string; findingCounts?: FindingCounts } = {}
+  options: { disclaimer?: string; findingCounts?: FindingCounts; aiAnalysis?: AIAnalysisResult } = {}
 ) {
   const grouped = groupBySeverity(findings);
   const disclaimer = options.disclaimer ?? "This report provides compliance assistance, not legal certification.";
 
   let comment = `## ComplyPatch AI Review\n\n`;
   comment += `**Compliance Score:** ${score}/100\n\n`;
+  if (options.aiAnalysis?.status === "completed" && typeof options.aiAnalysis.riskScore === "number") {
+    comment += `**AI Risk Score:** ${options.aiAnalysis.riskScore}/100`;
+    if (options.aiAnalysis.riskLevel) {
+      comment += ` (${options.aiAnalysis.riskLevel})`;
+    }
+    comment += `\n\n`;
+  }
   comment += `_Demo note: live GitHub posting is mocked for this hackathon flow._\n\n`;
 
   if (findings.length === 0) {
@@ -44,6 +51,9 @@ export function generatePrComment(
   }
 
   comment += `### Recommendation\n`;
+  if (options.aiAnalysis?.status === "completed" && options.aiAnalysis.suggestedRemediation) {
+    comment += `${options.aiAnalysis.suggestedRemediation}\n\n`;
+  }
   comment += `Do not merge until Critical and High findings are reviewed and fixed.\n\n`;
   comment += `_${disclaimer}_\n`;
 

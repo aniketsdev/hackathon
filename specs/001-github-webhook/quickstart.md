@@ -29,6 +29,16 @@ export GITHUB_TOKEN="runtime-only-token-or-installation-token"
 export GITHUB_POST_COMMENTS="true"
 ```
 
+Optional for GitHub login in the Next.js UI:
+
+```bash
+export GITHUB_CLIENT_ID="oauth-app-client-id"
+export GITHUB_CLIENT_SECRET="oauth-app-client-secret"
+export GITHUB_SESSION_SECRET="replace-with-32-plus-character-secret"
+export GITHUB_OAUTH_REDIRECT_URI="http://127.0.0.1:3000/api/auth/github/callback"
+export GITHUB_OAUTH_SCOPE="read:user repo"
+```
+
 Optional for AI summaries:
 
 ```bash
@@ -44,6 +54,7 @@ Expected behavior:
 - `GITHUB_API_BASE_URL` is optional and only needed for GitHub Enterprise or API mocking.
 - `GITHUB_TOKEN` or GitHub App installation access is optional; without it, scans still produce local PR comment previews.
 - `GITHUB_OPERATION_STORE=postgres` stores delivery, skipped-file, scan, outbound comment, and connected repository state in Postgres.
+- GitHub OAuth login lets the UI scan private repositories using an encrypted httpOnly session cookie.
 - Missing or rejected OpenAI credentials show AI analysis as unavailable without failing the scan result.
 - Do not use `GITHUB_OWNER` or `GITHUB_REPO`; repository identity is dynamic and comes from `POST /api/github/repositories` plus the webhook payload.
 
@@ -155,7 +166,9 @@ Expected outcomes:
 Expected outcomes:
 
 - Supported PR deliveries are accepted for processing.
+- PRs created from IDEs, Codex, Claude, or the GitHub UI all use the same GitHub webhook path after the PR exists.
 - Changed files are scanned with existing ComplyPatch rules.
+- AI analysis can add risk scoring when `OPENAI_API_KEY` is configured and AI analysis is enabled.
 - Vulnerable endpoints and code findings appear in the generated PR comment.
 - Duplicate deliveries for the same PR head commit do not create duplicate active comments.
 - Missing GitHub posting configuration still produces a local PR comment preview.

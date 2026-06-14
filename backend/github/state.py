@@ -148,6 +148,7 @@ class DemoOperationStore:
             summary=scan.summary,
             findings=findings,
             prComment=scan.prComment,
+            aiAnalysis=scan.aiAnalysis,
         )
         with _lock:
             operation = _operations.get(delivery_id)

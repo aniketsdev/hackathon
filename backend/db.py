@@ -89,9 +89,13 @@ CREATE TABLE IF NOT EXISTS scan_results (
     score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
     summary TEXT NOT NULL,
     findings JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ai_analysis JSONB,
     pr_comment TEXT NOT NULL,
     completed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE scan_results
+    ADD COLUMN IF NOT EXISTS ai_analysis JSONB;
 
 CREATE TABLE IF NOT EXISTS outbound_github_actions (
     delivery_id TEXT PRIMARY KEY REFERENCES github_deliveries(delivery_id) ON DELETE CASCADE,

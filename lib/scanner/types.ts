@@ -30,6 +30,8 @@ export type AIAnalysisStatus = "not_configured" | "skipped" | "completed" | "fai
 
 export type AIAnalysisResult = {
   status: AIAnalysisStatus;
+  riskScore?: number;
+  riskLevel?: "low" | "medium" | "high" | "critical";
   summary?: string;
   complianceContext?: string;
   suggestedRemediation?: string;

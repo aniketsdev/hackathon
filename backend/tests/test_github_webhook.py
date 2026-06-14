@@ -357,13 +357,11 @@ class GitHubWebhookTest(unittest.TestCase):
             response = connect_github_repository(
                 RepositoryConnectRequest(repositoryFullName="owner/repo"),
             )
-            url_response = client.post(
-                "/api/github/repositories",
-                json={"repositoryUrl": "https://github.com/owner/repo"},
+            url_response = connect_github_repository(
+                RepositoryConnectRequest(repositoryUrl="https://github.com/owner/repo"),
             )
-            rejected = client.post(
-                "/api/github/repositories",
-                json={"repositoryFullName": "other/repo"},
+            rejected = connect_github_repository(
+                RepositoryConnectRequest(repositoryFullName="other/repo"),
             )
         finally:
             self._restore_env("GITHUB_ALLOWED_REPOSITORIES", previous_allowed)

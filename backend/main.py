@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.agents.compliance_agent import generate_summary
+from backend.agents.compliance_agent import generate_ai_analysis, generate_summary
 from backend.github.client import connect_repository
 from backend.github.operations import operation_store_from_env
 from backend.github.pr_comment import generate_pr_comment
@@ -55,13 +55,15 @@ def create_scan(request: ScanRequest) -> ScanResponse:
     findings = scan_files(request.files)
     score = calculate_score(findings)
     summary = generate_summary(score, findings)
-    pr_comment = generate_pr_comment(score, findings)
+    ai_analysis = generate_ai_analysis(score, findings)
+    pr_comment = generate_pr_comment(score, findings, ai_analysis=ai_analysis)
 
     return ScanResponse(
         score=score,
         summary=summary,
         findings=findings,
         prComment=pr_comment,
+        aiAnalysis=ai_analysis,
     )
 
 
