@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from backend.github import state
+from backend.github.operations import operation_store_from_env
 from backend.models import (
     ConnectedRepositoryResponse,
     PullRequestFileRecord,
@@ -217,7 +217,9 @@ def connect_repository(
     message = "Repository connected for PR scan previews"
     if permissions == "read_write":
         message = "Repository connected for PR scans and comments"
-    return state.connect_repository(repository, permissions_status=permissions, message=message)
+    store = operation_store_from_env()
+    store.ensure_schema()
+    return store.connect_repository(repository, permissions_status=permissions, message=message)
 
 
 def normalize_repository_full_name(value: str) -> str | None:

@@ -4,12 +4,10 @@ import os
 import unittest
 from hashlib import sha256
 
-from fastapi.testclient import TestClient
-
 from backend.github.client import GitHubApiError, GitHubSettings, connect_repository
 from backend.github.state import DemoOperationStore, is_repository_connected, reset_state
 from backend.github.webhook import process_github_webhook, verify_signature
-from backend.main import app
+from backend.main import connect_github_repository, get_github_operation
 from backend.models import PullRequestFileRecord, RepositoryConnectRequest, SourceFile
 
 
@@ -83,6 +81,8 @@ class FakeGitHubClient:
 class GitHubWebhookTest(unittest.TestCase):
     def setUp(self) -> None:
         reset_state()
+        self.previous_operation_store = os.environ.get("GITHUB_OPERATION_STORE")
+        os.environ["GITHUB_OPERATION_STORE"] = "memory"
         self.store = DemoOperationStore()
         self.settings = GitHubSettings(
             webhook_secret="test-secret",
@@ -92,6 +92,7 @@ class GitHubWebhookTest(unittest.TestCase):
         )
 
     def tearDown(self) -> None:
+        self._restore_env("GITHUB_OPERATION_STORE", self.previous_operation_store)
         reset_state()
 
     def test_signature_verification_accepts_valid_signature(self) -> None:
@@ -262,47 +263,40 @@ class GitHubWebhookTest(unittest.TestCase):
         self.assertIsNone(operation.scan)
 
     def test_operation_status_route_returns_success_and_missing(self) -> None:
-        client = TestClient(app)
         previous_secret = os.environ.get("GITHUB_WEBHOOK_SECRET")
         previous_allowed = os.environ.get("GITHUB_ALLOWED_REPOSITORIES")
         os.environ["GITHUB_WEBHOOK_SECRET"] = "test-secret"
         os.environ["GITHUB_ALLOWED_REPOSITORIES"] = "owner/repo"
         try:
             raw_body = json.dumps({"repository": {"full_name": "owner/repo"}}).encode("utf-8")
-            response = client.post(
-                "/api/github/webhook",
-                content=raw_body,
-                headers=self._headers("delivery-route", "ping", raw_body),
+            response_status, _ = process_github_webhook(
+                raw_body,
+                self._headers("delivery-route", "ping", raw_body),
             )
-            status = client.get("/api/github/operations/delivery-route")
-            missing = client.get("/api/github/operations/missing")
+            status = get_github_operation("delivery-route")
+            missing = get_github_operation("missing")
         finally:
             self._restore_env("GITHUB_WEBHOOK_SECRET", previous_secret)
             self._restore_env("GITHUB_ALLOWED_REPOSITORIES", previous_allowed)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(status.status_code, 200)
-        self.assertEqual(status.json()["delivery"]["status"], "ignored")
+        self.assertEqual(response_status, 200)
+        self.assertEqual(status.delivery.status, "ignored")
         self.assertEqual(missing.status_code, 404)
 
     def test_repository_connection_route_connects_allowed_repo(self) -> None:
-        client = TestClient(app)
         previous_allowed = os.environ.get("GITHUB_ALLOWED_REPOSITORIES")
         os.environ["GITHUB_ALLOWED_REPOSITORIES"] = "owner/repo"
         try:
-            response = client.post(
-                "/api/github/repositories",
-                json={"repositoryFullName": "owner/repo"},
+            response = connect_github_repository(
+                RepositoryConnectRequest(repositoryFullName="owner/repo"),
             )
-            rejected = client.post(
-                "/api/github/repositories",
-                json={"repositoryFullName": "other/repo"},
+            rejected = connect_github_repository(
+                RepositoryConnectRequest(repositoryFullName="other/repo"),
             )
         finally:
             self._restore_env("GITHUB_ALLOWED_REPOSITORIES", previous_allowed)
 
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["connectionStatus"], "connected")
+        self.assertEqual(response.connectionStatus, "connected")
         self.assertEqual(rejected.status_code, 400)
 
     def _headers(self, delivery_id: str, event: str, raw_body: bytes) -> dict[str, str]:

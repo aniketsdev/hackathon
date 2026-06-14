@@ -96,12 +96,11 @@ p {
 
 .app-shell {
   display: grid;
-  width: min(1480px, calc(100% - 36px));
+  width: min(1760px, calc(100% - 36px));
   min-height: 100dvh;
-  max-height: 100dvh;
   margin: 0 auto;
   padding: 18px 0;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto;
   gap: 12px;
 }
 
@@ -206,6 +205,7 @@ p {
 
 .intake-card {
   display: grid;
+  min-width: 0;
   min-height: 128px;
   align-content: start;
   gap: 10px;
@@ -397,6 +397,7 @@ p {
 
 .metric-card {
   display: grid;
+  min-width: 0;
   min-height: 98px;
   align-content: space-between;
   padding: 14px;
@@ -435,28 +436,32 @@ p {
 
 .workbench {
   display: grid;
-  min-height: 0;
-  grid-template-columns: minmax(290px, 0.78fr) minmax(420px, 1.24fr) minmax(320px, 0.92fr);
+  align-items: start;
+  grid-template-columns: minmax(320px, 0.82fr) minmax(620px, 1.18fr) minmax(340px, 0.8fr);
   gap: 10px;
 }
 
 .surface {
   display: grid;
+  min-width: 0;
   min-height: 0;
   padding: 14px;
 }
 
 .comment-surface {
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: start;
+  grid-template-rows: auto auto auto;
 }
 
 .source-surface {
-  grid-template-rows: auto minmax(120px, 0.75fr) minmax(0, auto);
+  align-content: start;
+  grid-template-rows: auto auto auto;
   gap: 10px;
 }
 
 .findings-surface {
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  align-content: start;
+  grid-template-rows: auto auto auto auto auto;
   gap: 12px;
 }
 
@@ -464,6 +469,14 @@ p {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 12px;
+}
+
+.surface-head > div {
+  min-width: 0;
+}
+
+.surface-head h2 {
+  overflow-wrap: anywhere;
 }
 
 .mono-pill,
@@ -497,21 +510,24 @@ p {
 }
 
 .code-window {
-  min-height: 0;
+  min-height: 180px;
+  max-height: 360px;
   overflow: auto;
   padding: 13px;
 }
 
 .comment-window {
-  min-height: 0;
+  min-height: 280px;
+  max-height: 540px;
   overflow: auto;
   padding: 13px;
 }
 
 .evidence-dock {
   display: grid;
-  min-height: 0;
-  max-height: 270px;
+  min-height: 190px;
+  max-height: 360px;
+  align-content: start;
   gap: 7px;
   overflow: auto;
   border: 1px solid var(--grey-200);
@@ -621,7 +637,8 @@ p {
 
 .findings-scroll {
   display: grid;
-  min-height: 0;
+  min-height: 300px;
+  max-height: clamp(360px, 58vh, 760px);
   align-content: start;
   gap: 9px;
   overflow: auto;
@@ -680,6 +697,10 @@ p {
   gap: 12px;
 }
 
+.finding-topline > span:first-child {
+  min-width: 0;
+}
+
 .fix-text {
   border-top: 1px solid var(--grey-150);
   padding-top: 7px;
@@ -695,11 +716,67 @@ p {
 .analysis-block {
   display: grid;
   gap: 7px;
+  min-width: 0;
+  overflow: hidden;
   padding: 12px;
 }
 
 .analysis-block p {
   margin-bottom: 0;
+}
+
+.compact-status {
+  max-height: 150px;
+  overflow: auto;
+}
+
+.status-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-heading strong {
+  color: var(--grey-900);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.status-chip {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--grey-300);
+  background: var(--white);
+  color: var(--grey-700);
+  padding: 6px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.status-copy {
+  color: var(--grey-600);
+  font-size: 13px;
+}
+
+.ai-status-done {
+  background: var(--white);
+}
+
+.ai-status-steady,
+.ai-status-warn {
+  border-color: var(--grey-300);
+  background:
+    linear-gradient(90deg, var(--grey-150) 3px, transparent 3px),
+    var(--grey-25);
 }
 
 .error-box {
@@ -840,11 +917,21 @@ p {
   }
 }
 
-@media (max-width: 1200px) {
-  .app-shell {
-    max-height: none;
+@media (max-width: 1540px) {
+  .workbench {
+    grid-template-columns: minmax(320px, 0.84fr) minmax(560px, 1.16fr);
   }
 
+  .comment-surface {
+    grid-column: 1 / -1;
+  }
+
+  .comment-window {
+    max-height: 460px;
+  }
+}
+
+@media (max-width: 1200px) {
   .topbar,
   .status-strip {
     align-items: stretch;
@@ -869,7 +956,18 @@ p {
   }
 
   .surface {
-    min-height: 420px;
+    min-height: 0;
+  }
+
+  .code-window,
+  .comment-window,
+  .findings-scroll,
+  .evidence-dock {
+    max-height: none;
+  }
+
+  .findings-scroll {
+    min-height: 360px;
   }
 }
 

@@ -4,8 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.agents.compliance_agent import generate_summary
 from backend.github.client import connect_repository
+from backend.github.operations import operation_store_from_env
 from backend.github.pr_comment import generate_pr_comment
-from backend.github.state import DemoOperationStore
 from backend.github.webhook import process_github_webhook
 from backend.models import (
     ConnectedRepositoryResponse,
@@ -83,7 +83,8 @@ async def github_webhook(request: Request) -> JSONResponse:
 
 @app.get("/api/github/operations/{delivery_id}", response_model=GitHubOperationResponse)
 def get_github_operation(delivery_id: str) -> GitHubOperationResponse | JSONResponse:
-    store = DemoOperationStore()
+    store = operation_store_from_env()
+    store.ensure_schema()
     operation = store.get_operation(delivery_id)
 
     if operation is None:

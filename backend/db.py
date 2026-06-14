@@ -105,4 +105,12 @@ CREATE TABLE IF NOT EXISTS outbound_github_actions (
     failure_reason TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS connected_repositories (
+    repository_full_name TEXT PRIMARY KEY,
+    permissions_status TEXT NOT NULL,
+    message TEXT,
+    connected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """

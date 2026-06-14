@@ -43,10 +43,14 @@ uv run uvicorn backend.main:app --reload --port 8000
 Set local environment values in `.env`:
 
 ```text
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
 GITHUB_WEBHOOK_SECRET=dev-webhook-secret-change-me
 GITHUB_POST_COMMENTS=false
 GITHUB_ALLOWED_REPOSITORIES=owner/repo
 GITHUB_TOKEN=
+GITHUB_OPERATION_STORE=postgres
+DATABASE_URL=postgresql://user:password@localhost:5432/complypatch
 ```
 
 Open:
@@ -89,7 +93,9 @@ Copy `.env.example` to `.env` for the FastAPI backend:
 cp .env.example .env
 ```
 
-For the first demo, OpenAI and GitHub tokens are optional because the scanner works locally.
+For the first demo, OpenAI and GitHub tokens are optional because the scanner works locally. If AI analysis is enabled and the OpenAI key is missing or rejected, the UI shows an unavailable status while preserving score, findings, and the PR comment.
+
+Use `GITHUB_OPERATION_STORE=postgres` with `DATABASE_URL` for production-style persistence of GitHub deliveries, skipped files, scan results, outbound comment state, and connected repositories. Use `GITHUB_OPERATION_STORE=memory` for isolated local tests.
 
 ## MVP Features
 
@@ -102,7 +108,7 @@ For the first demo, OpenAI and GitHub tokens are optional because the scanner wo
 - FastAPI scan API with matching response shape
 - GitHub webhook receiver with signed delivery verification
 - PR comment preview/post/update flow
-- In-memory operation status for demo delivery tracking
+- Postgres-backed operation status for production-style delivery tracking
 
 ## Not Legal Advice
 

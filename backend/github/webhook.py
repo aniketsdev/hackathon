@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from backend.agents.compliance_agent import generate_summary
 from backend.github.client import GitHubApiError, GitHubClient, GitHubSettings, sanitize_error
-from backend.github import state
+from backend.github.operations import operation_store_from_env
 from backend.github.state import DemoOperationStore
 from backend.github.pr_comment import build_comment_marker, generate_pr_comment
 from backend.models import OutboundOperation, ScanResponse, WebhookAck
@@ -47,7 +47,7 @@ def process_github_webhook(
     if not settings.webhook_secret:
         return 503, WebhookAck(status="rejected", message="Webhook receiver is not configured")
 
-    store = store or DemoOperationStore()
+    store = store or operation_store_from_env()
     store.ensure_schema()
 
     delivery_id = _header(headers, "x-github-delivery")
@@ -107,7 +107,7 @@ def process_github_webhook(
     head_sha = context["head_sha"]
 
     if not settings.allows_repository(repository_full_name) or (
-        not settings.allowed_repositories and not state.is_repository_connected(repository_full_name)
+        not settings.allowed_repositories and not store.is_repository_connected(repository_full_name)
     ):
         store.record_delivery(
             delivery_id=delivery_id,

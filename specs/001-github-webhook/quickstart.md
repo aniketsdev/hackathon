@@ -16,6 +16,8 @@ Do not commit GitHub secrets, app private keys, tokens, or OpenAI keys.
 export GITHUB_WEBHOOK_SECRET="replace-with-demo-secret"
 export GITHUB_POST_COMMENTS="false"
 export GITHUB_ALLOWED_REPOSITORIES="owner/repo"
+export GITHUB_OPERATION_STORE="postgres"
+export DATABASE_URL="postgresql://user:password@localhost:5432/complypatch"
 ```
 
 Optional for live PR comments:
@@ -25,12 +27,21 @@ export GITHUB_TOKEN="runtime-only-token-or-installation-token"
 export GITHUB_POST_COMMENTS="true"
 ```
 
+Optional for AI summaries:
+
+```bash
+export OPENAI_API_KEY="runtime-only-openai-key"
+export OPENAI_MODEL="gpt-4o-mini"
+```
+
 Expected behavior:
 
 - `GITHUB_WEBHOOK_SECRET` is required for live webhook verification.
 - `GITHUB_POST_COMMENTS=false` keeps the demo in preview mode.
 - `GITHUB_ALLOWED_REPOSITORIES` limits which repositories are accepted.
 - `GITHUB_TOKEN` or GitHub App installation access is optional; without it, scans still produce local PR comment previews.
+- `GITHUB_OPERATION_STORE=postgres` stores delivery, skipped-file, scan, outbound comment, and connected repository state in Postgres.
+- Missing or rejected OpenAI credentials show AI analysis as unavailable without failing the scan result.
 
 ## Run The Backend
 
@@ -114,7 +125,9 @@ Expected outcomes:
 - Unsupported events return `200` with ignored status.
 - Supported PR deliveries for connected repositories return `202`.
 - Operation status includes scan result and outbound preview/posting status.
-- Restarting the backend clears in-memory delivery history, which keeps the hackathon demo simple and avoids local database setup.
+- In Postgres mode, restarting the backend preserves delivery history and connected repositories.
+- Skipped files are summarized compactly, including the 50-file demo limit.
+- OpenAI `401` or missing-key cases are shown as non-blocking AI status, not as scan failures.
 
 ## Validate With A Real Pull Request
 

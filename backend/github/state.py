@@ -56,6 +56,22 @@ class DemoOperationStore:
     def ensure_schema(self) -> None:
         return None
 
+    def connect_repository(
+        self,
+        repository_full_name: str,
+        *,
+        permissions_status: str,
+        message: str | None = None,
+    ) -> ConnectedRepositoryResponse:
+        return connect_repository(
+            repository_full_name,
+            permissions_status=permissions_status,
+            message=message,
+        )
+
+    def is_repository_connected(self, repository_full_name: str) -> bool:
+        return is_repository_connected(repository_full_name)
+
     def record_delivery(
         self,
         *,

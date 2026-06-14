@@ -6,8 +6,10 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from backend.db import connect, init_db
+from backend.db import get_database_url
 from backend.github.pr_comment import redact_sensitive_value
 from backend.models import (
+    ConnectedRepositoryResponse,
     DeliveryOperation,
     GitHubOperationResponse,
     OutboundOperation,
@@ -17,12 +19,64 @@ from backend.models import (
 )
 
 
+def operation_store_from_env():
+    database_url = get_database_url(required=False)
+    mode = _store_mode()
+    if mode == "memory" or (mode == "auto" and not database_url):
+        from backend.github.state import DemoOperationStore
+
+        return DemoOperationStore()
+
+    if mode not in {"auto", "postgres"}:
+        raise ValueError("GITHUB_OPERATION_STORE must be auto, postgres, or memory")
+
+    return PostgresOperationStore(database_url)
+
+
 class PostgresOperationStore:
     def __init__(self, database_url: str | None = None):
         self.database_url = database_url
 
     def ensure_schema(self) -> None:
         init_db(self.database_url)
+
+    def connect_repository(
+        self,
+        repository_full_name: str,
+        *,
+        permissions_status: str,
+        message: str | None = None,
+    ) -> ConnectedRepositoryResponse:
+        with connect(self.database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO connected_repositories (
+                        repository_full_name, permissions_status, message, updated_at
+                    )
+                    VALUES (%s, %s, %s, now())
+                    ON CONFLICT (repository_full_name) DO UPDATE SET
+                        permissions_status = EXCLUDED.permissions_status,
+                        message = EXCLUDED.message,
+                        updated_at = now()
+                    """,
+                    (repository_full_name.lower(), permissions_status, message),
+                )
+        return ConnectedRepositoryResponse(
+            repositoryFullName=repository_full_name.lower(),
+            connectionStatus="connected",
+            permissionsStatus=permissions_status,
+            message=message,
+        )
+
+    def is_repository_connected(self, repository_full_name: str) -> bool:
+        with connect(self.database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM connected_repositories WHERE repository_full_name = %s",
+                    (repository_full_name.lower(),),
+                )
+                return cur.fetchone() is not None
 
     def record_delivery(
         self,
@@ -231,6 +285,7 @@ class PostgresOperationStore:
                 cur.execute("DELETE FROM skipped_files")
                 cur.execute("DELETE FROM pull_request_files")
                 cur.execute("DELETE FROM github_deliveries")
+                cur.execute("DELETE FROM connected_repositories")
 
     def _scan_response(self, row: dict[str, Any]) -> ScanResponse:
         return ScanResponse(
@@ -248,3 +303,9 @@ class PostgresOperationStore:
             commentUrl=row["comment_url"],
             failureReason=row["failure_reason"],
         )
+
+
+def _store_mode() -> str:
+    from os import environ
+
+    return environ.get("GITHUB_OPERATION_STORE", "auto").strip().lower() or "auto"
