@@ -1,9 +1,16 @@
 from collections import defaultdict
+import re
 
 from backend.models import Finding
 
+COMMENT_MARKER_PREFIX = "<!-- complypatch-ai:pr-comment:"
 
-def generate_pr_comment(score: int, findings: list[Finding]) -> str:
+
+def build_comment_marker(head_sha: str) -> str:
+    return f"{COMMENT_MARKER_PREFIX}{head_sha} -->"
+
+
+def generate_pr_comment(score: int, findings: list[Finding], marker: str | None = None) -> str:
     grouped: dict[str, list[Finding]] = defaultdict(list)
     for finding in findings:
         grouped[finding.severity].append(finding)
@@ -35,9 +42,23 @@ def generate_pr_comment(score: int, findings: list[Finding]) -> str:
     comment += "### Recommendation\n"
     comment += "Do not merge until Critical and High findings are reviewed and fixed.\n\n"
     comment += "_This is an automated compliance-readiness review, not legal certification._\n"
+    if marker:
+        comment += f"\n{marker}\n"
 
     return comment
 
 
 def safe_inline(value: str) -> str:
-    return value.replace("`", "'")[:180]
+    sanitized = redact_sensitive_value(value.replace("`", "'"))
+    return sanitized[:180]
+
+
+def redact_sensitive_value(value: str) -> str:
+    sanitized = value
+    sanitized = re.sub(r"sk-[A-Za-z0-9_-]{8,}", "sk-[redacted]", sanitized)
+    sanitized = re.sub(
+        r"(?i)(api[_-]?key|access[_-]?token|private[_-]?key|password)\s*=\s*['\"][^'\"]+['\"]",
+        r"\1='[redacted]'",
+        sanitized,
+    )
+    return sanitized
