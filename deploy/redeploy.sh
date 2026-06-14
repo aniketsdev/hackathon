@@ -14,6 +14,7 @@ rsync -az --delete -e "ssh -i $KEY -o StrictHostKeyChecking=no" \
 
 ssh -i "$KEY" -o StrictHostKeyChecking=no "ec2-user@$PUBIP" \
   "cd ~/app && export DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 && \
-   docker compose build && docker compose up -d && docker compose ps"
+   docker compose build && docker compose up -d && \
+   docker compose restart nginx && docker compose ps"
 
 echo "Redeployed. App: https://$(cat deploy/.cfdomain)/"
