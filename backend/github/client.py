@@ -324,23 +324,15 @@ def extract_added_line_numbers(patch: str) -> set[int]:
 def load_runtime_env() -> dict[str, str]:
     root_env = read_dotenv(".env")
     backend_env = read_dotenv("backend/.env")
-    keys = set(root_env) | set(backend_env) | set(os.environ)
-    values: dict[str, str] = {}
+    if os.environ.get("COMPLYPATCH_ENV_OVERRIDES", "").lower() in {"1", "true", "yes", "on"}:
+        values = dict(root_env)
+        values.update(backend_env)
+        values.update(os.environ)
+        return values
 
-    for key in keys:
-        current = os.environ.get(key)
-        root_value = root_env.get(key)
-        backend_value = backend_env.get(key)
-
-        if current is not None and current != root_value:
-            values[key] = current
-        elif backend_value is not None:
-            values[key] = backend_value
-        elif current is not None:
-            values[key] = current
-        elif root_value is not None:
-            values[key] = root_value
-
+    values = dict(os.environ)
+    values.update(root_env)
+    values.update(backend_env)
     return values
 
 

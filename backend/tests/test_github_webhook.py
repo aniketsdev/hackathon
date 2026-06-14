@@ -93,6 +93,8 @@ class GitHubWebhookTest(unittest.TestCase):
     def setUp(self) -> None:
         reset_state()
         self.previous_operation_store = os.environ.get("GITHUB_OPERATION_STORE")
+        self.previous_env_overrides = os.environ.get("COMPLYPATCH_ENV_OVERRIDES")
+        os.environ["COMPLYPATCH_ENV_OVERRIDES"] = "1"
         os.environ["GITHUB_OPERATION_STORE"] = "memory"
         self.store = DemoOperationStore()
         self.settings = GitHubSettings(
@@ -104,6 +106,7 @@ class GitHubWebhookTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         self._restore_env("GITHUB_OPERATION_STORE", self.previous_operation_store)
+        self._restore_env("COMPLYPATCH_ENV_OVERRIDES", self.previous_env_overrides)
         reset_state()
 
     def test_signature_verification_accepts_valid_signature(self) -> None:
@@ -368,8 +371,8 @@ class GitHubWebhookTest(unittest.TestCase):
 
         self.assertEqual(response.connectionStatus, "connected")
         self.assertEqual(response.repositoryFullName, "owner/repo")
-        self.assertEqual(url_response.status_code, 201)
-        self.assertEqual(url_response.json()["repositoryFullName"], "owner/repo")
+        self.assertEqual(url_response.connectionStatus, "connected")
+        self.assertEqual(url_response.repositoryFullName, "owner/repo")
         self.assertEqual(rejected.status_code, 400)
 
     def test_webhook_root_alias_and_info_routes_help_setup(self) -> None:

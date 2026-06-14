@@ -1,0 +1,12 @@
+# Never commit the SSH key or per-deploy state/outputs.
+*.pem
+cf-out.json
+.iid
+.sg
+.vpc
+.ami
+.myip
+.pubip
+.pubdns
+.cfid
+.cfdomain
