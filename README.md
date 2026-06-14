@@ -37,6 +37,7 @@ FastAPI backend:
 
 ```bash
 uv sync
+cd /home/ttpl-lnvl15-0262/Documents/Learn/hackathon
 uv run uvicorn backend.main:app --reload --port 8000
 ```
 
@@ -45,7 +46,8 @@ Set local environment values in `.env`:
 ```text
 GITHUB_WEBHOOK_SECRET=dev-webhook-secret-change-me
 GITHUB_POST_COMMENTS=false
-GITHUB_ALLOWED_REPOSITORIES=owner/repo
+GITHUB_ALLOWED_REPOSITORIES=
+GITHUB_API_BASE_URL=https://api.github.com
 GITHUB_TOKEN=
 ```
 
@@ -68,6 +70,8 @@ POST http://localhost:8000/api/github/repositories
 POST http://localhost:8000/api/github/webhook
 GET http://localhost:8000/api/github/operations/{delivery_id}
 ```
+
+Repositories are dynamic: connect `owner/repo` or a GitHub repository URL through `/api/github/repositories`. Do not configure fixed `GITHUB_OWNER` or `GITHUB_REPO` values for this flow.
 
 ## Build Check
 

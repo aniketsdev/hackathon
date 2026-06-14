@@ -9,9 +9,12 @@ Adds or enables a repository for ComplyPatch AI PR review.
 ```json
 {
   "repositoryFullName": "owner/repo",
+  "repositoryUrl": "https://github.com/owner/repo",
   "installationId": 123456
 }
 ```
+
+`repositoryFullName` or `repositoryUrl` may be supplied. The backend normalizes either value to `owner/repo`. Repository identity is request-driven and is not read from fixed `GITHUB_OWNER` or `GITHUB_REPO` environment variables.
 
 ### Responses
 

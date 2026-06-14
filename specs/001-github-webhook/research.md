@@ -13,6 +13,18 @@
 
 **Reference**: GitHub Docs, building a GitHub App that responds to webhook events: https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/building-a-github-app-that-responds-to-webhook-events
 
+## Decision: Keep Repository Identity Dynamic
+
+**Decision**: Accept repository identity from the repository connection request as either `owner/repo` or a GitHub repository URL, normalize it to `owner/repo`, and verify webhook payload repository identity against connected or allowlisted repositories at runtime.
+
+**Rationale**: The demo must work for whichever repository the user adds. Fixed `GITHUB_OWNER` and `GITHUB_REPO` environment values make the backend brittle and conflict with the add-repository flow. Environment should only hold secrets, optional posting flags, optional allowlists, and optional API base URL overrides.
+
+**Alternatives considered**:
+
+- Fixed owner/repo environment variables: rejected because the repository URL is dynamic and supplied by the user.
+- UI-only repository selection: rejected for this planning slice because the user explicitly asked not to work on UI.
+- Accept any webhook repository without connection: rejected because this weakens the safety gate for live webhook payloads.
+
 ## Decision: Verify Webhook Deliveries Before Processing
 
 **Decision**: Require live webhook deliveries to include GitHub delivery metadata and verify the `X-Hub-Signature-256` HMAC signature against the raw request body before parsing or scanning.

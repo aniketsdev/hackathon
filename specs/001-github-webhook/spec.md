@@ -22,6 +22,7 @@ As a demo operator, I want to connect a GitHub repository to ComplyPatch AI so p
 
 1. **Given** a user provides a repository that ComplyPatch AI is allowed to access, **When** they add the repository, **Then** the repository is marked connected and ready to receive pull request deliveries.
 2. **Given** a repository is not allowed or cannot be reached with the configured GitHub access, **When** the user tries to add it, **Then** ComplyPatch AI shows a clear setup failure without exposing tokens or secrets.
+3. **Given** a user provides a GitHub repository URL or `owner/repo` value at runtime, **When** they add the repository, **Then** ComplyPatch AI normalizes that dynamic repository identity and does not depend on fixed `GITHUB_OWNER` or `GITHUB_REPO` environment values.
 
 ---
 
@@ -83,6 +84,7 @@ As a demo operator, I want to see whether webhook intake, scanning, and PR comme
 
 - **FR-001**: System MUST let a user add or enable a GitHub repository for ComplyPatch AI review.
 - **FR-002**: System MUST accept GitHub pull request deliveries only for connected or allowed repositories.
+- **FR-002a**: System MUST support dynamic repository identity from the repository connection request or webhook payload, and MUST NOT require a fixed repository owner/name in environment configuration.
 - **FR-003**: System MUST verify that each live delivery came from GitHub before processing repository or pull request data.
 - **FR-004**: System MUST support pull request opened, reopened, synchronized, and ready-for-review events for the first GitHub-connected demo.
 - **FR-005**: System MUST ignore unsupported GitHub events without treating them as scan failures.
@@ -120,6 +122,7 @@ As a demo operator, I want to see whether webhook intake, scanning, and PR comme
 - The first implementation focuses on GitHub pull request review events; issues, pushes, releases, workflow runs, and organization events are out of scope.
 - GitHub App installation is the preferred connection model for repository access and webhook delivery.
 - The demo repository grants enough read access to collect changed file contents and optional write access to create or update PR comments.
+- Repository URLs are dynamic. Runtime configuration may restrict allowed repositories, but repository owner/name is not fixed in `.env`.
 - GitHub posting may be disabled in local demo mode; in that case, the generated PR comment preview is still a successful fallback.
 - Existing scanner rules and PR comment formatting remain the source of truth for finding categories and comment content.
 - This feature provides compliance assistance for demos and does not certify legal or regulatory compliance.
