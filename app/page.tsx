@@ -507,10 +507,14 @@ export default function Home() {
                 <section className="analysis-block">
                   <span className="eyebrow">AI analysis</span>
                   <strong>{result.aiAnalysis.status}</strong>
-                  {result.aiAnalysis.summary && <p>{result.aiAnalysis.summary}</p>}
-                  {result.aiAnalysis.complianceContext && <p>{result.aiAnalysis.complianceContext}</p>}
-                  {result.aiAnalysis.suggestedRemediation && <p>{result.aiAnalysis.suggestedRemediation}</p>}
-                  {result.aiAnalysis.errorMessage && <p>{result.aiAnalysis.errorMessage}</p>}
+                  {renderOptionalText(result.aiAnalysis.summary) && <p>{renderOptionalText(result.aiAnalysis.summary)}</p>}
+                  {renderOptionalText(result.aiAnalysis.complianceContext) && (
+                    <p>{renderOptionalText(result.aiAnalysis.complianceContext)}</p>
+                  )}
+                  {renderOptionalText(result.aiAnalysis.suggestedRemediation) && (
+                    <p>{renderOptionalText(result.aiAnalysis.suggestedRemediation)}</p>
+                  )}
+                  {renderOptionalText(result.aiAnalysis.errorMessage) && <p>{renderOptionalText(result.aiAnalysis.errorMessage)}</p>}
                 </section>
               )}
             </>
@@ -545,6 +549,14 @@ export default function Home() {
 function getBrowserFilePath(file: File) {
   const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath;
   return relativePath || file.name;
+}
+
+function renderOptionalText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(renderOptionalText).filter(Boolean).join(" ");
+  if (value && typeof value === "object") return JSON.stringify(value);
+  return "";
 }
 
 function MetricCard({

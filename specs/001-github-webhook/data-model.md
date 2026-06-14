@@ -7,6 +7,7 @@ Represents one GitHub repository enabled for ComplyPatch AI review.
 **Fields**:
 
 - `repository_full_name`: Repository owner/name, unique within the demo.
+- `repository_url`: Optional user-provided GitHub repository URL before normalization.
 - `installation_id`: GitHub App installation identifier when available.
 - `connection_status`: `connected`, `disabled`, or `failed`.
 - `permissions_status`: `unknown`, `read_only`, or `read_write`.
@@ -16,6 +17,8 @@ Represents one GitHub repository enabled for ComplyPatch AI review.
 **Validation rules**:
 
 - Repository identity is required before pull request deliveries are accepted.
+- Repository identity may be supplied as `owner/repo` or a GitHub URL and is normalized to `owner/repo`.
+- Fixed `GITHUB_OWNER` and `GITHUB_REPO` environment values are not used for repository identity.
 - Failed or disabled repositories do not trigger scans.
 - Tokens, app keys, and webhook secrets are never stored in this entity.
 

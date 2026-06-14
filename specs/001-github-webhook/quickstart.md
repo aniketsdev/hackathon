@@ -15,7 +15,8 @@ Do not commit GitHub secrets, app private keys, tokens, or OpenAI keys.
 ```bash
 export GITHUB_WEBHOOK_SECRET="replace-with-demo-secret"
 export GITHUB_POST_COMMENTS="false"
-export GITHUB_ALLOWED_REPOSITORIES="owner/repo"
+export GITHUB_ALLOWED_REPOSITORIES=""
+export GITHUB_API_BASE_URL="https://api.github.com"
 ```
 
 Optional for live PR comments:
@@ -29,8 +30,10 @@ Expected behavior:
 
 - `GITHUB_WEBHOOK_SECRET` is required for live webhook verification.
 - `GITHUB_POST_COMMENTS=false` keeps the demo in preview mode.
-- `GITHUB_ALLOWED_REPOSITORIES` limits which repositories are accepted.
+- `GITHUB_ALLOWED_REPOSITORIES` is optional. Leave it empty to accept repositories connected through the backend, or set a comma-separated allowlist such as `owner/repo,another/repo`.
+- `GITHUB_API_BASE_URL` is optional and only needed for GitHub Enterprise or API mocking.
 - `GITHUB_TOKEN` or GitHub App installation access is optional; without it, scans still produce local PR comment previews.
+- Do not use `GITHUB_OWNER` or `GITHUB_REPO`; repository identity is dynamic and comes from `POST /api/github/repositories` plus the webhook payload.
 
 ## Run The Backend
 
@@ -79,6 +82,14 @@ Connect the demo repository before accepting webhook deliveries when you are not
 curl -X POST http://localhost:8000/api/github/repositories \
   -H "Content-Type: application/json" \
   -d '{"repositoryFullName":"owner/repo"}'
+```
+
+Dynamic URL input should also be supported by the implementation plan:
+
+```bash
+curl -X POST http://localhost:8000/api/github/repositories \
+  -H "Content-Type: application/json" \
+  -d '{"repositoryUrl":"https://github.com/owner/repo"}'
 ```
 
 Expected result:

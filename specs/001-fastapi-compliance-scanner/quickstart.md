@@ -131,6 +131,7 @@ Expected result when OpenAI is unavailable:
 Use this only if backend code is changed:
 
 ```bash
+cd /home/ttpl-lnvl15-0262/Documents/Learn/hackathon
 uv run python -m unittest backend.tests.test_scan
 uv run uvicorn backend.main:app --reload --port 8000
 curl http://127.0.0.1:8000/health
