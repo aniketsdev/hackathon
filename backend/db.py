@@ -36,7 +36,10 @@ def get_database_url(required: bool = True) -> str | None:
 
 def connect(database_url: str | None = None):
     url = database_url or get_database_url(required=True)
-    return psycopg.connect(url)
+    # prepare_threshold=None disables server-side prepared statements so the same
+    # connection code works behind Supabase's transaction pooler (Supavisor/PgBouncer),
+    # which otherwise raises "prepared statement already exists" under serverless reuse.
+    return psycopg.connect(url, prepare_threshold=None)
 
 
 def init_db(database_url: str | None = None) -> None:

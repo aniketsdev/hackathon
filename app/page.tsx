@@ -60,7 +60,7 @@ export default function LandingPage() {
 
         <div className="hero-console" aria-label="Pull request compliance preview">
           <div className="console-top">
-            <span>github.com/aniketsdev/cafc-backend</span>
+            <span>github.com/aniketsdev/example-test</span>
             <strong>blocking</strong>
           </div>
           <div className="console-pr">
