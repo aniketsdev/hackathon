@@ -20,6 +20,8 @@ ComplyPatch AI reviews code like a compliance engineer.
 
 ## Quick Start
 
+Frontend:
+
 ```bash
 npm install
 npm run dev
@@ -31,10 +33,35 @@ Open:
 http://localhost:3000
 ```
 
+FastAPI backend:
+
+```bash
+uv sync
+uv run uvicorn backend.main:app --reload --port 8000
+```
+
+Open:
+
+```text
+http://localhost:8000/health
+```
+
+Scan endpoint:
+
+```text
+POST http://localhost:8000/api/scans
+```
+
 ## Build Check
 
 ```bash
 npm run build
+```
+
+Backend test check:
+
+```bash
+uv run python -m unittest discover backend/tests
 ```
 
 ## Environment
@@ -55,6 +82,7 @@ For the first demo, OpenAI and GitHub tokens are optional because the scanner wo
 - Findings table
 - GitHub PR comment generator
 - API endpoint for scanning code
+- FastAPI scan API with matching response shape
 
 ## Not Legal Advice
 
