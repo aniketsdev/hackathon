@@ -5,7 +5,7 @@ import type { SourceFile } from "./types";
 export const MAX_SCAN_FILES = 50;
 export const MAX_FILE_CHARS = 200_000;
 
-const SUPPORTED_EXTENSIONS = new Set([
+export const SUPPORTED_EXTENSIONS = new Set([
   ".cjs",
   ".css",
   ".go",
@@ -28,7 +28,9 @@ const SUPPORTED_EXTENSIONS = new Set([
   ".yml"
 ]);
 
-const SKIP_DIRS = new Set([
+export const SUPPORTED_EXTENSIONLESS_FILES = new Set(["dockerfile", "makefile", "readme"]);
+
+export const SKIP_DIRS = new Set([
   ".git",
   ".next",
   ".venv",
@@ -103,7 +105,7 @@ async function addFile(filePath: string, root: string, files: SourceFile[], skip
   const ext = path.extname(filePath).toLowerCase();
   const relativePath = path.relative(root, filePath) || path.basename(filePath);
 
-  if (!SUPPORTED_EXTENSIONS.has(ext)) {
+  if (!isSupportedScanFile(filePath)) {
     skipped.push(`${relativePath}: unsupported file type`);
     return;
   }
@@ -126,4 +128,15 @@ async function addFile(filePath: string, root: string, files: SourceFile[], skip
 function isInsideRoot(root: string, candidate: string) {
   const relative = path.relative(root, candidate);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+export function isSupportedScanFile(filePath: string) {
+  const extension = path.extname(filePath).toLowerCase();
+  if (SUPPORTED_EXTENSIONS.has(extension)) return true;
+
+  return SUPPORTED_EXTENSIONLESS_FILES.has(path.basename(filePath).toLowerCase());
+}
+
+export function hasSkippedScanDirectory(filePath: string) {
+  return filePath.split(/[\\/]+/).some((segment) => SKIP_DIRS.has(segment));
 }

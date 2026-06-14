@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  devIndicators: false,
+  poweredByHeader: false,
+  reactStrictMode: true,
   turbopack: {
     root: __dirname
   }
