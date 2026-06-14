@@ -8,10 +8,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from backend.db import load_dotenv
-from backend.models import PullRequestFileRecord, SkippedFile, SourceFile
+from backend.github import state
+from backend.models import (
+    ConnectedRepositoryResponse,
+    PullRequestFileRecord,
+    RepositoryConnectRequest,
+    SkippedFile,
+    SourceFile,
+)
 
 
 MAX_SCAN_FILES = 50
@@ -183,6 +190,57 @@ class GitHubClient:
             raise GitHubApiError(sanitize_error(f"GitHub API failed: {exc.code} {message}")) from exc
         except urllib.error.URLError as exc:
             raise GitHubApiError(sanitize_error(f"GitHub API request failed: {exc.reason}")) from exc
+
+
+def connect_repository(
+    request: RepositoryConnectRequest,
+    settings: GitHubSettings | None = None,
+) -> ConnectedRepositoryResponse:
+    settings = settings or GitHubSettings.from_env()
+    repository = normalize_repository_full_name(request.repositoryFullName)
+    if not repository:
+        return ConnectedRepositoryResponse(
+            repositoryFullName=request.repositoryFullName,
+            connectionStatus="failed",
+            permissionsStatus="unknown",
+            message="Repository must use owner/repo format",
+        )
+    if not settings.allows_repository(repository):
+        return ConnectedRepositoryResponse(
+            repositoryFullName=repository,
+            connectionStatus="failed",
+            permissionsStatus="unknown",
+            message="Repository is not allowed",
+        )
+
+    permissions = "read_write" if settings.post_comments and settings.token else "read_only"
+    message = "Repository connected for PR scan previews"
+    if permissions == "read_write":
+        message = "Repository connected for PR scans and comments"
+    return state.connect_repository(repository, permissions_status=permissions, message=message)
+
+
+def normalize_repository_full_name(value: str) -> str | None:
+    repository = value.strip().strip("/")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+        return None
+    return repository
+
+
+def load_dotenv(path: str | Path = ".env") -> None:
+    env_path = Path(path)
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 def sanitize_error(value: str) -> str:

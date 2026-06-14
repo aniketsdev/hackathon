@@ -7,7 +7,8 @@ from typing import Any, Mapping
 
 from backend.agents.compliance_agent import generate_summary
 from backend.github.client import GitHubApiError, GitHubClient, GitHubSettings, sanitize_error
-from backend.github.operations import PostgresOperationStore
+from backend.github import state
+from backend.github.state import DemoOperationStore
 from backend.github.pr_comment import build_comment_marker, generate_pr_comment
 from backend.models import OutboundOperation, ScanResponse, WebhookAck
 from backend.scanner.scan import scan_files
@@ -38,7 +39,7 @@ def process_github_webhook(
     raw_body: bytes,
     headers: Mapping[str, str],
     *,
-    store: PostgresOperationStore | None = None,
+    store: DemoOperationStore | None = None,
     settings: GitHubSettings | None = None,
     client: GitHubClient | None = None,
 ) -> tuple[int, WebhookAck]:
@@ -46,7 +47,7 @@ def process_github_webhook(
     if not settings.webhook_secret:
         return 503, WebhookAck(status="rejected", message="Webhook receiver is not configured")
 
-    store = store or PostgresOperationStore()
+    store = store or DemoOperationStore()
     store.ensure_schema()
 
     delivery_id = _header(headers, "x-github-delivery")
@@ -105,7 +106,9 @@ def process_github_webhook(
     pull_request_number = context["pull_request_number"]
     head_sha = context["head_sha"]
 
-    if not settings.allows_repository(repository_full_name):
+    if not settings.allows_repository(repository_full_name) or (
+        not settings.allowed_repositories and not state.is_repository_connected(repository_full_name)
+    ):
         store.record_delivery(
             delivery_id=delivery_id,
             event=event,
@@ -114,9 +117,9 @@ def process_github_webhook(
             pull_request_number=pull_request_number,
             head_sha=head_sha,
             status="rejected",
-            rejection_reason="Repository is not allowed",
+            rejection_reason="Repository is not connected",
         )
-        return 403, WebhookAck(deliveryId=delivery_id, status="rejected", message="Repository is not allowed")
+        return 403, WebhookAck(deliveryId=delivery_id, status="rejected", message="Repository is not connected")
 
     if action not in SUPPORTED_PR_ACTIONS:
         store.record_delivery(

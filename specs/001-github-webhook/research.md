@@ -1,106 +1,102 @@
-# Research: GitHub Webhook Operations
+# Research: GitHub PR Webhook Comments
 
-## Decision: Process Pull Request Webhook Actions Only
+## Decision: Use GitHub App Webhooks for Repository Connection
 
-**Decision**: Support `pull_request` deliveries for `opened`, `reopened`, `synchronize`, and `ready_for_review`. Acknowledge `ping` and unsupported events without scanning.
+**Decision**: Treat repository connection as a GitHub App installation or equivalent app-level setup that grants access to selected repositories and sends pull request webhook deliveries.
 
-**Rationale**: The feature spec is centered on PR review. These actions cover a new PR, a reopened PR, new commits on a PR, and a draft PR becoming reviewable. Keeping other GitHub events out of scope protects the hackathon demo from unnecessary branching.
-
-**Alternatives considered**:
-
-- Support all GitHub events: rejected because it increases scope without improving the core demo.
-- Support only `opened`: rejected because new commits on an existing PR are common and should trigger a fresh scan.
-
-## Decision: Verify Webhook Deliveries With X-Hub-Signature-256
-
-**Decision**: Require the GitHub `X-Hub-Signature-256` header and verify the raw request body with HMAC-SHA256 before parsing or processing the payload.
-
-**Rationale**: GitHub recommends `X-Hub-Signature-256`; verification must use the unmodified payload bytes and the configured webhook secret. Invalid or missing signatures must stop processing before any scan or outbound GitHub action.
+**Rationale**: GitHub documents GitHub Apps receiving webhook events for repositories the app can access, including pull request events, and then calling GitHub APIs in response. This fits the requested "add repo, connect GitHub, comment on PR" flow while keeping permissions scoped to selected repositories.
 
 **Alternatives considered**:
 
-- Trust GitHub IP ranges: rejected for demo complexity and because signature verification is the direct integration control.
-- Accept unsigned local deliveries in live mode: rejected because the feature requirement says deliveries must be verified.
+- Personal access token only: rejected as the primary plan because repo-specific app installation is easier to reason about for webhook ownership and least privilege.
+- Manual paste/local repo scan only: rejected because the requested feature is GitHub-connected automation.
+
+**Reference**: GitHub Docs, building a GitHub App that responds to webhook events: https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/building-a-github-app-that-responds-to-webhook-events
+
+## Decision: Verify Webhook Deliveries Before Processing
+
+**Decision**: Require live webhook deliveries to include GitHub delivery metadata and verify the `X-Hub-Signature-256` HMAC signature against the raw request body before parsing or scanning.
+
+**Rationale**: GitHub recommends validating webhook signatures before processing to ensure deliveries came from GitHub and were not tampered with. Invalid or missing signatures must stop processing before file collection, scanning, or outbound commenting.
+
+**Alternatives considered**:
+
+- Trust only repository allowlists: rejected because allowlists do not prove payload authenticity.
+- Accept unsigned webhooks in demo mode: rejected for live GitHub deliveries; local fixture tests can bypass network delivery but must not represent live mode.
 
 **Reference**: GitHub Docs, validating webhook deliveries: https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
 
-## Decision: Use Existing Scanner Limits For Changed Files
+## Decision: Process Pull Request Events Only for V1
 
-**Decision**: Keep the scan input bounded to 50 files and 200,000 characters per file. Files beyond those bounds are skipped and reported in operation evidence.
+**Decision**: Support `pull_request` deliveries for `opened`, `reopened`, `synchronize`, and `ready_for_review`, acknowledge `ping`, and ignore unsupported events without scanning.
 
-**Rationale**: The current backend model already defines these demo-safe limits. Reusing them keeps behavior predictable and avoids memory or latency surprises.
-
-**Alternatives considered**:
-
-- Scan the entire repository: rejected because the feature is PR-centered and would be too slow for the demo.
-- Add async storage and a queue immediately: rejected because in-memory status is enough for a single hackathon demo repository.
-
-## Decision: Use Pull Request File Metadata And Available Content
-
-**Decision**: Fetch the PR file list from GitHub, then scan available file content for supported files. If full content is unavailable, scan the available patch text and mark the content source in evidence.
-
-**Rationale**: The PR file list is the natural GitHub source for changed paths. Full content improves missing-auth detection; patch fallback still supports secrets, PII logging, unsafe SQL, wildcard CORS, and insecure cookie findings in many demo cases.
+**Rationale**: The user asked for PR comments when a PR is created or updated. These actions cover new PRs, reopened PRs, new commits, and draft-to-ready transitions without expanding into push, issue, release, or workflow events.
 
 **Alternatives considered**:
 
-- Require local repository checkout: rejected because it adds setup risk and dependency on git execution during webhook processing.
-- Scan only patch text: rejected as the only path because some rules are better against full files.
+- Support all GitHub events: rejected because it increases demo risk and does not improve the PR review workflow.
+- Support only `opened`: rejected because commits pushed after PR creation should trigger a fresh scan.
 
-**Reference**: GitHub Docs, REST pull request endpoints: https://docs.github.com/en/rest/pulls/pulls
+**Reference**: GitHub Docs, webhook events and payloads: https://docs.github.com/en/webhooks/webhook-events-and-payloads
 
-## Decision: Post A Timeline Issue Comment, Not Inline Review Comments
+## Decision: Use PR File List and Repository Content/Patch Fallback
 
-**Decision**: Post or update a single pull request timeline comment using GitHub issue comments.
+**Decision**: Fetch the changed files for the pull request, then scan full relevant file content when available; if full content is unavailable, scan patch text and mark the content source.
 
-**Rationale**: GitHub pull requests are issues for shared comment operations, and the current ComplyPatch output is one report-style markdown body. Inline review comments require diff positions and would add complexity that is not needed for the demo.
-
-**Alternatives considered**:
-
-- Pull request review comments: rejected for this slice because they require path and diff line targeting for each finding.
-- Commit statuses/check runs: rejected because the user specifically asked for "our post" and the current product already has PR-style comments.
-
-**Reference**: GitHub Docs, issue comments on pull requests: https://docs.github.com/en/rest/issues/comments
-
-## Decision: Use A Stable Comment Marker For De-Duplication
-
-**Decision**: Add a hidden ComplyPatch marker to the generated comment body and update an existing bot comment for the same PR commit when possible.
-
-**Rationale**: This keeps each commit from accumulating duplicate comments when GitHub redelivers a webhook or a user retries the demo.
+**Rationale**: GitHub pull request APIs expose PRs and associated file information. Full file content improves route-level and missing-auth rules, while patch fallback still catches many secrets, logging, unsafe SQL, cookie, and CORS patterns.
 
 **Alternatives considered**:
 
-- Always create a new comment: rejected because duplicate comments make the demo noisy.
-- Delete old comments: rejected because updating is less destructive and easier to explain.
+- Clone the repository for every webhook: rejected for the demo because it adds runtime and environment complexity.
+- Scan only file paths: rejected because findings require evidence.
 
-## Decision: Optional GitHub Posting With Local Preview Fallback
+**References**:
 
-**Decision**: If a GitHub write token or posting toggle is not configured, complete the scan and expose the generated PR comment locally without attempting outbound GitHub posting.
+- GitHub Docs, REST API endpoints for pull requests: https://docs.github.com/en/rest/pulls/pulls
+- GitHub Docs, REST API endpoints for repository contents: https://docs.github.com/rest/repos/contents
 
-**Rationale**: This follows the project demo-safety rule: live GitHub integration should not block the demo when credentials or permissions are risky.
+## Decision: Post a Single PR Timeline Comment
 
-**Alternatives considered**:
+**Decision**: Post or update one pull request timeline comment containing the ComplyPatch AI report rather than many inline review comments.
 
-- Fail the whole scan when posting is unavailable: rejected because scan results are still valuable.
-- Require posting for all tests: rejected because CI and local development should not need live GitHub credentials.
-
-## Decision: Persist Operation Status In PostgreSQL
-
-**Decision**: Store inbound delivery, changed-file metadata, scan results, findings, skipped files, generated PR comment markdown, and outbound posting status in PostgreSQL for the webhook implementation.
-
-**Rationale**: The feature must run as a production-style GitHub integration, so delivery state cannot disappear on process restart and cannot depend on local process memory. PostgreSQL also aligns with the existing target architecture for scan persistence.
+**Rationale**: GitHub pull requests are also issues for shared comment operations, and the current ComplyPatch output is one report-style markdown body. Inline review comments require precise diff line positioning and add complexity beyond the requested first demo.
 
 **Alternatives considered**:
 
-- Process-local memory: rejected because the user requested PostgreSQL-backed production behavior.
-- Store JSON files: rejected because it is still local-only state and does not match the target production architecture.
+- Inline pull request review comments: deferred because they require diff line mapping for each finding.
+- Commit statuses/check runs: deferred because the user specifically asked for a comment and the product already formats PR-style comments.
 
-## Decision: Use Direct PostgreSQL Driver And Idempotent Schema Creation
+**Reference**: GitHub Docs, REST API endpoints for issue comments: https://docs.github.com/en/rest/issues/comments
 
-**Decision**: Use `psycopg` and an idempotent schema initialization function that creates the required tables and indexes if they do not exist.
+## Decision: Use a Stable Comment Marker for De-Duplication
 
-**Rationale**: This keeps the implementation simple for a hackathon demo while still using real PostgreSQL. A full migration framework can be added later when the data model stabilizes.
+**Decision**: Include a hidden ComplyPatch marker in the comment body and update an existing bot comment for the same PR head commit when possible.
+
+**Rationale**: GitHub may redeliver webhooks and users may push multiple commits. Updating a marked comment prevents noisy duplicate comments while keeping the latest scan visible.
 
 **Alternatives considered**:
 
-- SQLAlchemy and Alembic: deferred because they add more moving parts than needed for this slice.
-- Raw `psql` scripts only: rejected because the deployed app still needs a safe way to initialize a fresh demo database.
+- Always create a new comment: rejected because duplicate comments degrade the review experience.
+- Delete old comments: rejected because update/replace is less destructive and easier to audit.
+
+## Decision: Keep GitHub Posting Optional With Local Preview Fallback
+
+**Decision**: If write permission or posting configuration is unavailable, complete the scan and expose the generated PR comment locally.
+
+**Rationale**: This follows the project's demo-safety guidance: live GitHub credentials should not be required for every local validation run, and scan output remains useful without outbound posting.
+
+**Alternatives considered**:
+
+- Fail the scan when posting is unavailable: rejected because scan results and comment preview still satisfy the core review artifact.
+- Require live GitHub for all tests: rejected because CI/local tests should not depend on external credentials.
+
+## Decision: Use Lightweight Demo State First
+
+**Decision**: Track connected repositories, deliveries, scan results, and outbound status in a simple demo-safe state layer first, with a clear later upgrade path to persistent storage if needed.
+
+**Rationale**: The hackathon goal is a stable working demo and the current project does not have a database dependency. Keeping the first version lightweight avoids adding infrastructure before the GitHub loop is proven.
+
+**Alternatives considered**:
+
+- Add PostgreSQL immediately: deferred because it adds setup burden and is not required for the requested demo.
+- Store no state at all: rejected because idempotency and operation status require at least bounded operation tracking.
