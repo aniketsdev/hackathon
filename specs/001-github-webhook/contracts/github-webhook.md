@@ -1,4 +1,37 @@
-# Contract: GitHub Webhook Operations
+# Contract: GitHub PR Webhook Comments
+
+## POST /api/github/repositories
+
+Adds or enables a repository for ComplyPatch AI PR review.
+
+### Request
+
+```json
+{
+  "repositoryFullName": "owner/repo",
+  "installationId": 123456
+}
+```
+
+### Responses
+
+`201 Created`:
+
+```json
+{
+  "repositoryFullName": "owner/repo",
+  "connectionStatus": "connected",
+  "permissionsStatus": "read_write"
+}
+```
+
+`400 Bad Request`:
+
+```json
+{
+  "message": "Repository could not be connected"
+}
+```
 
 ## POST /api/github/webhook
 
@@ -16,7 +49,7 @@ Receives GitHub webhook deliveries.
 | Event | Actions | Behavior |
 | --- | --- | --- |
 | `ping` | any | Acknowledge setup, do not scan |
-| `pull_request` | `opened`, `reopened`, `synchronize`, `ready_for_review` | Accept for scan processing |
+| `pull_request` | `opened`, `reopened`, `synchronize`, `ready_for_review` | Accept for scan processing when repository is connected |
 | any other event | any | Acknowledge as ignored, do not scan |
 
 ### Pull Request Payload Fields Used
@@ -28,6 +61,9 @@ Receives GitHub webhook deliveries.
     "full_name": "owner/repo",
     "owner": { "login": "owner" },
     "name": "repo"
+  },
+  "installation": {
+    "id": 123456
   },
   "pull_request": {
     "number": 12,
@@ -76,6 +112,16 @@ Receives GitHub webhook deliveries.
 {
   "status": "rejected",
   "message": "Invalid webhook signature"
+}
+```
+
+`403 Forbidden` for a repository that is not connected or allowed:
+
+```json
+{
+  "deliveryId": "github-delivery-guid",
+  "status": "rejected",
+  "message": "Repository is not connected"
 }
 ```
 
@@ -134,6 +180,6 @@ Returns local operation status for a received delivery.
 ## Outbound GitHub Comment Behavior
 
 - Use one PR timeline comment for the full ComplyPatch report.
-- Include a hidden marker containing the delivery or head SHA so the comment can be updated instead of duplicated.
+- Include a hidden marker containing the head SHA so the comment can be updated instead of duplicated.
 - If posting is disabled or unauthorized, preserve the generated markdown comment in the operation response.
-- Sanitized errors may mention status codes and permission problems, but must not include access tokens, webhook secrets, or full sensitive payloads.
+- Sanitized errors may mention status codes and permission problems, but must not include access tokens, app keys, webhook secrets, or full sensitive payloads.
